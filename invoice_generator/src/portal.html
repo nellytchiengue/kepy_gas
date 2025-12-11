@@ -1,0 +1,179 @@
+<!DOCTYPE html!>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>KEPY – Mon activité</title>
+    <style>
+      :root { --pad:16px; --radius:12px; }
+      * { box-sizing: border-box; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin:0; color:#111; background:#fafafa; }
+      header { position:sticky; top:0; background:#fff; border-bottom:1px solid #eee; padding:12px var(--pad); z-index:10; }
+      .wrap { padding: var(--pad); max-width:1100px; margin: 0 auto; }
+      .topline { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      .pill { background:#f1f3f5; border:1px solid #e9ecef; padding:6px 12px; border-radius:999px; font-size:14px; }
+      .muted { color:#666; }
+      .strong { font-weight:700; }
+      form.filters { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+      form.filters input, form.filters button, form.filters a.button {
+        padding:10px 12px; border:1px solid #ddd; border-radius:10px; background:#fff; font-size:14px;
+      }
+      form.filters button { cursor:pointer; }
+      form.filters a.button { text-decoration:none; display:inline-block; }
+      .cards { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+      .card { background:#fff; border:1px solid #eee; border-radius:var(--radius); padding:12px; }
+      .card h4 { margin:0 0 6px 0; font-size:14px; color:#333; }
+      .kpis { display:flex; gap:10px; flex-wrap:wrap; }
+      table { width:100%; border-collapse:collapse; background:#fff; border:1px solid #eee; border-radius:12px; overflow:hidden; }
+      thead th { position:sticky; top:58px; background:#fff; border-bottom:1px solid #eee; padding:10px; text-align:left; font-weight:600; }
+      tbody td { border-bottom:1px solid #f2f2f2; padding:10px; vertical-align:top; }
+      tbody tr:nth-child(even) { background:#fcfcfc; }
+      .right { text-align:right; }
+      .empty { padding:24px; text-align:center; color:#666; background:#fff; border:1px dashed #ddd; border-radius:12px; }
+      .tools { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0 16px; }
+      .tools button, .tools a { padding:10px 12px; border-radius:10px; border:1px solid #ddd; background:#fff; cursor:pointer; text-decoration:none; }
+      footer { color:#888; font-size:12px; padding:16px; text-align:center; }
+      @media (max-width:720px){
+        thead th:nth-child(2), tbody td:nth-child(2) { display:none; } /* cache VendorNom si besoin sur mobile */
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <div class="topline">
+          <div class="pill">
+            Bonjour <span class="strong"><?= data.vendor.Nom ?></span>
+            &nbsp;<span class="muted">(<?= data.vendor.VendorID ?>)</span>
+            <? if ((data.vendor.Role||'').toUpperCase()==='REVENDEUR') { ?>
+              &nbsp;• <span class="muted">Portée : vous + votre équipe</span>
+            <? } else { ?>
+              &nbsp;• <span class="muted">Portée : vous uniquement</span>
+            <? } ?>
+          </div>
+          <div class="pill">Total : <span class="strong" id="total-amount"><?= data.total ?></span></div>
+          <? if (Object.keys(data.totalsByDevise||{}).length > 1) { ?>
+            <div class="pill">
+              Totaux par devise :
+              <? for (var k in data.totalsByDevise) { ?>
+                <span class="strong"><?= k ?>:</span> <?= data.totalsByDevise[k] ?>&nbsp;
+              <? } ?>
+            </div>
+          <? } else { 
+               var one = Object.keys(data.totalsByDevise||{})[0];
+               if (one) { ?>
+                 <div class="pill">Devise : <span class="strong"><?= one ?></span></div>
+               <? } 
+             } ?>
+        </div>
+
+        <!-- Filtres serveur (rechargent la page avec ?t=...&q=...&from=...&to=...) -->
+        <form class="filters" method="GET">
+          <input type="hidden" name="t" value="<?= data.vendor.Token || '' ?>">
+          <input name="q" value="<?= data.q||'' ?>" placeholder="Recherche (produit, client, vendeur, entrepôt…)" />
+          <input name="from" type="date" value="<?= data.from||'' ?>" />
+          <input name="to"   type="date" value="<?= data.to||'' ?>" />
+          <button type="submit">Filtrer</button>
+          <a class="button" href="?t=<?= encodeURIComponent(data.vendor.Token||'') ?>">Réinitialiser</a>
+        </form>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="tools">
+        <button type="button" onclick="exportCSV()">Exporter CSV</button>
+        <button type="button" onclick="copyLink()">Copier le lien (avec filtres)</button>
+      </div>
+
+      <? if ((data.rows||[]).length === 0) { ?>
+        <div class="empty">
+          Aucune donnée à afficher avec les filtres actuels.
+        </div>
+      <? } else { ?>
+        <table id="tbl">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Vendeur</th>
+              <th>Produit</th>
+              <th class="right">Qté</th>
+              <th class="right">PU</th>
+              <th class="right">Montant</th>
+              <th>Devise</th>
+              <th>Client</th>
+              <th>Entrepôt</th>
+              <th>Mode paiement</th>
+              <th>SaleID</th>
+            </tr>
+          </thead>
+          <tbody>
+            <? for (var r of data.rows) { ?>
+              <tr>
+                <td><?= r.DateVente || r.Timestamp ?></td>
+                <td><?= r.VendorNom ?></td>
+                <td><?= r.Produit ?></td>
+                <td class="right"><?= r.Quantite ?></td>
+                <td class="right"><?= r.PU ?></td>
+                <td class="right"><?= r.Montant ?></td>
+                <td><?= r.Devise ?></td>
+                <td><?= r.Client || '' ?></td>
+                <td><?= r.Entrepot || '' ?></td>
+                <td><?= r.ModePaiement || '' ?></td>
+                <td><?= r.SaleID ?></td>
+              </tr>
+            <? } ?>
+          </tbody>
+        </table>
+      <? } ?>
+    </main>
+
+    <footer>
+      KEPY – Portail vendeur · Dernière mise à jour côté serveur à l’ouverture de la page.
+    </footer>
+
+    <script>
+      // Construit le CSV à partir du tableau affiché (WYSIWYG)
+      function exportCSV(){
+        const table = document.getElementById('tbl');
+        if(!table){ alert('Rien à exporter.'); return; }
+        let csv = [];
+        const rows = table.querySelectorAll('tr');
+        rows.forEach(tr=>{
+          const cells = tr.querySelectorAll('th,td');
+          const line = Array.from(cells).map(td=>{
+            // échappe les guillemets et encapsule
+            let t = (td.innerText||'').replace(/"/g,'""');
+            return `"${t}"`;
+          }).join(',');
+          csv.push(line);
+        });
+        const blob = new Blob([csv.join('\n')], {type:'text/csv;charset=utf-8;'});
+        const a = document.createElement('a');
+        const d = new Date();
+        const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+        a.href = URL.createObjectURL(blob);
+        a.download = `kepy_export_${y}${m}${day}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      // Copie l’URL actuelle avec filtres dans le presse-papiers
+      function copyLink(){
+        const url = new URL(window.location.href);
+        navigator.clipboard.writeText(url.toString()).then(
+          ()=> alert('Lien copié.'),
+          ()=> {
+            // fallback
+            const ta = document.createElement('textarea');
+            ta.value = url.toString();
+            document.body.appendChild(ta);
+            ta.select(); document.execCommand('copy');
+            document.body.removeChild(ta);
+            alert('Lien copié.');
+          }
+        );
+      }
+    </script>
+  </body>
+</html>
