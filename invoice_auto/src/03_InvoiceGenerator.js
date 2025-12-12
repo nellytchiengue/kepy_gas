@@ -1,36 +1,38 @@
 /**
  * @file 03_InvoiceGenerator.js
- * @description Génération automatique de factures PDF à partir d'un template Google Docs
- * @version 1.0
+ * @description Automatic PDF invoice generation from Google Docs template
+ * @version 1.1 (Standardized)
  * @date 2025-12-11
  */
 
 // ============================================================================
-// GÉNÉRATION D'UNE FACTURE INDIVIDUELLE
+// INDIVIDUAL INVOICE GENERATION
 // ============================================================================
 
 /**
- * Génère une facture PDF pour un ID donné
- * @param {string} invoiceId - L'ID de la facture à générer
+ * Generates a PDF invoice for a given ID
+ * @param {string} invoiceId - The invoice ID to generate
  * @returns {Object} {success: boolean, message: string, url: string}
  */
 function generateInvoiceById(invoiceId) {
   try {
-    // 1. RÉCUPÉRATION DES DONNÉES
+    // 1. DATA RETRIEVAL
     const invoiceData = getInvoiceDataById(invoiceId);
 
     if (!invoiceData) {
+      const lang = detectUserLanguage();
+      const messages = getMessages(lang);
       return {
         success: false,
-        message: INVOICE_CONFIG.MESSAGES.ERROR_NO_DATA,
+        message: messages.ERROR_NO_DATA,
         url: null
       };
     }
 
-    // 2. VALIDATION DES DONNÉES
+    // 2. DATA VALIDATION
     const validation = validateInvoiceData(invoiceData);
     if (!validation.isValid) {
-      const errorMsg = `❌ Données invalides pour ${invoiceId}:\n${validation.errors.join('\n')}`;
+      const errorMsg = `❌ Invalid data for ${invoiceId}:\n${validation.errors.join('\n')}`;
       logError('generateInvoiceById', errorMsg);
       return {
         success: false,
@@ -39,105 +41,109 @@ function generateInvoiceById(invoiceId) {
       };
     }
 
-    // 3. RÉCUPÉRATION DES PARAMÈTRES
-    const templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.ID_TEMPLATE_DOCS);
-    const folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.ID_DOSSIER_DRIVE);
-    const entrepriseParams = getEntrepriseParams();
+    // 3. RETRIEVE PARAMETERS
+    const templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
+    const folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID);
+    const companyParams = getCompanyParams();
 
     if (!templateId || !folderId) {
+      const lang = detectUserLanguage();
+      const messages = getMessages(lang);
       return {
         success: false,
-        message: INVOICE_CONFIG.MESSAGES.ERROR_MISSING_PARAMS,
+        message: messages.ERROR_MISSING_PARAMS,
         url: null
       };
     }
 
-    // 4. CRÉATION DU DOCUMENT À PARTIR DU TEMPLATE
+    // 4. CREATE DOCUMENT FROM TEMPLATE
     const templateFile = DriveApp.getFileById(templateId);
     const targetFolder = DriveApp.getFolderById(folderId);
 
-    const fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientNom);
+    const fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientName);
     const newDocFile = templateFile.makeCopy(fileName, targetFolder);
     const doc = DocumentApp.openById(newDocFile.getId());
     const body = doc.getBody();
 
-    // 5. REMPLACEMENT DES MARQUEURS
-    replaceMarkers(body, invoiceData, entrepriseParams);
+    // 5. REPLACE MARKERS
+    replaceMarkers(body, invoiceData, companyParams);
 
-    // 6. SAUVEGARDE DU DOCUMENT
+    // 6. SAVE DOCUMENT
     doc.saveAndClose();
 
-    // 7. GÉNÉRATION DU PDF
+    // 7. GENERATE PDF
     const pdfBlob = newDocFile.getAs(MimeType.PDF).setName(fileName + '.pdf');
     const pdfFile = targetFolder.createFile(pdfBlob);
     const pdfUrl = pdfFile.getUrl();
 
-    // 8. SUPPRESSION DU DOCUMENT TEMPORAIRE (optionnel)
+    // 8. DELETE TEMPORARY DOCUMENT (optional)
     newDocFile.setTrashed(true);
 
-    // 9. MISE À JOUR DU STATUT DANS LE SHEET
+    // 9. UPDATE STATUS IN SHEET
     markInvoiceAsGenerated(invoiceData.invoiceId, pdfUrl);
 
-    // 10. ENVOI EMAIL (SI ACTIVÉ)
+    // 10. SEND EMAIL (IF ENABLED)
     const autoSendEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.AUTO_SEND_EMAIL);
     if (autoSendEmail === 'true' || autoSendEmail === true) {
-      sendInvoiceEmail(invoiceData, pdfFile, entrepriseParams);
+      sendInvoiceEmail(invoiceData, pdfFile, companyParams);
     }
 
-    logSuccess('generateInvoiceById', `Facture ${invoiceId} générée avec succès`);
+    logSuccess('generateInvoiceById', `Invoice ${invoiceId} generated successfully`);
 
+    const lang = detectUserLanguage();
+    const messages = getMessages(lang);
     return {
       success: true,
-      message: INVOICE_CONFIG.MESSAGES.SUCCESS_GENERATION,
+      message: messages.SUCCESS_GENERATION,
       url: pdfUrl
     };
 
   } catch (error) {
-    logError('generateInvoiceById', `Erreur lors de la génération de ${invoiceId}`, error);
+    logError('generateInvoiceById', `Error generating ${invoiceId}`, error);
     return {
       success: false,
-      message: `❌ Erreur: ${error.message}`,
+      message: `❌ Error: ${error.message}`,
       url: null
     };
   }
 }
 
 // ============================================================================
-// REMPLACEMENT DES MARQUEURS DANS LE DOCUMENT
+// MARKER REPLACEMENT IN DOCUMENT
 // ============================================================================
 
 /**
- * Remplace tous les marqueurs dans le document avec les données réelles
- * @param {GoogleAppsScript.Document.Body} body - Le corps du document
- * @param {Object} invoiceData - Les données de la facture
- * @param {Object} entrepriseParams - Les paramètres de l'entreprise
+ * Replaces all markers in the document with actual data
+ * @param {GoogleAppsScript.Document.Body} body - The document body
+ * @param {Object} invoiceData - The invoice data
+ * @param {Object} companyParams - The company parameters
  */
-function replaceMarkers(body, invoiceData, entrepriseParams) {
-  // Informations Entreprise
-  body.replaceText(INVOICE_CONFIG.MARKERS.ENTREPRISE_NOM, entrepriseParams.nom);
-  body.replaceText(INVOICE_CONFIG.MARKERS.ENTREPRISE_ADRESSE, entrepriseParams.adresse);
-  body.replaceText(INVOICE_CONFIG.MARKERS.ENTREPRISE_TEL, entrepriseParams.tel);
-  body.replaceText(INVOICE_CONFIG.MARKERS.ENTREPRISE_EMAIL, entrepriseParams.email);
+function replaceMarkers(body, invoiceData, companyParams) {
+  // Company Information
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_NAME, companyParams.name || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_ADDRESS, companyParams.address || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_PHONE, companyParams.phone || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_EMAIL, companyParams.email || 'N/A');
 
-  // Informations Facture
-  body.replaceText(INVOICE_CONFIG.MARKERS.FACTURE_ID, invoiceData.invoiceId);
-  body.replaceText(INVOICE_CONFIG.MARKERS.FACTURE_DATE, formatDate(invoiceData.date));
+  // Invoice Information
+  body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_ID, invoiceData.invoiceId);
+  body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_DATE, formatDate(invoiceData.date));
 
-  // Informations Client
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_NOM, invoiceData.clientNom || 'N/A');
+  // Client Information
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_NAME, invoiceData.clientName || 'N/A');
   body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_EMAIL, invoiceData.clientEmail || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_TEL, invoiceData.clientTel || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_ADRESSE, invoiceData.clientAdresse || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_PHONE, invoiceData.clientPhone || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_ADDRESS, invoiceData.clientAddress || 'N/A');
 
-  // Détails de la transaction
-  body.replaceText(INVOICE_CONFIG.MARKERS.DESIGNATION, invoiceData.designation);
-  body.replaceText(INVOICE_CONFIG.MARKERS.QUANTITE, String(invoiceData.quantite));
-  body.replaceText(INVOICE_CONFIG.MARKERS.PRIX_UNITAIRE, formatAmount(invoiceData.prixUnitaire));
-  body.replaceText(INVOICE_CONFIG.MARKERS.MONTANT_TOTAL, formatAmount(invoiceData.montantTotal));
+  // Transaction Details
+  body.replaceText(INVOICE_CONFIG.MARKERS.DESCRIPTION, invoiceData.description);
+  body.replaceText(INVOICE_CONFIG.MARKERS.QUANTITY, String(invoiceData.quantity));
+  body.replaceText(INVOICE_CONFIG.MARKERS.UNIT_PRICE, formatAmount(invoiceData.unitPrice));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_AMOUNT, formatAmount(invoiceData.totalAmount));
 
-  // Montant en lettres
-  const montantLettres = nombreEnToutesLettres(invoiceData.montantTotal);
-  body.replaceText(INVOICE_CONFIG.MARKERS.MONTANT_LETTRES, montantLettres);
+  // Amount in Words
+  const amountInWords = convertAmountToWords(invoiceData.totalAmount);
+  body.replaceText(INVOICE_CONFIG.MARKERS.AMOUNT_IN_WORDS, amountInWords);
 }
 
 // ============================================================================

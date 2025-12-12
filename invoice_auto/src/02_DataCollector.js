@@ -1,106 +1,106 @@
 /**
  * @file 02_DataCollector.js
- * @description Collecte et manipulation des données du Google Sheet
- * @version 1.0
+ * @description Data collection and manipulation from Google Sheet
+ * @version 1.1 (Standardized)
  * @date 2025-12-11
  */
 
 // ============================================================================
-// RÉCUPÉRATION DES DONNÉES DE FACTURE
+// INVOICE DATA RETRIEVAL
 // ============================================================================
 
 /**
- * Récupère les données d'une facture par son ID
- * @param {string} invoiceId - L'ID unique de la facture
- * @returns {Object|null} Objet contenant toutes les données de la facture ou null si non trouvé
+ * Retrieves invoice data by its ID
+ * @param {string} invoiceId - The unique invoice ID
+ * @returns {Object|null} Object containing all invoice data or null if not found
  */
 function getInvoiceDataById(invoiceId) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const facturesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.FACTURES);
+    const invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
 
-    if (!facturesSheet) {
-      logError('getInvoiceDataById', 'Feuille Factures introuvable');
+    if (!invoicesSheet) {
+      logError('getInvoiceDataById', 'Invoices sheet not found');
       return null;
     }
 
-    const data = facturesSheet.getDataRange().getValues();
+    const data = invoicesSheet.getDataRange().getValues();
 
-    // La première ligne contient les en-têtes
+    // First row contains headers
     const headers = data[0];
 
-    // Parcourt les lignes pour trouver l'InvoiceID (colonne A)
+    // Loop through rows to find the InvoiceID (column A)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const currentInvoiceId = String(row[INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim();
 
       if (currentInvoiceId === String(invoiceId).trim()) {
-        // Construit l'objet de données
+        // Build data object
         return {
           invoiceId: currentInvoiceId,
           date: row[INVOICE_CONFIG.COLUMNS.DATE],
-          clientNom: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NOM]),
+          clientName: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]),
           clientEmail: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_EMAIL]),
-          clientTel: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_TEL]),
-          clientAdresse: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADRESSE]),
-          designation: cleanString(row[INVOICE_CONFIG.COLUMNS.DESIGNATION]),
-          quantite: Number(row[INVOICE_CONFIG.COLUMNS.QUANTITE]) || 1,
-          prixUnitaire: Number(row[INVOICE_CONFIG.COLUMNS.PRIX_UNITAIRE]) || 0,
-          montantTotal: Number(row[INVOICE_CONFIG.COLUMNS.MONTANT_TOTAL]) || 0,
-          statut: String(row[INVOICE_CONFIG.COLUMNS.STATUT]).trim(),
-          urlFacture: String(row[INVOICE_CONFIG.COLUMNS.URL_FACTURE] || '').trim(),
-          rowIndex: i + 1 // Index de la ligne (1-based pour Google Sheets)
+          clientPhone: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_PHONE]),
+          clientAddress: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADDRESS]),
+          description: cleanString(row[INVOICE_CONFIG.COLUMNS.DESCRIPTION]),
+          quantity: Number(row[INVOICE_CONFIG.COLUMNS.QUANTITY]) || 1,
+          unitPrice: Number(row[INVOICE_CONFIG.COLUMNS.UNIT_PRICE]) || 0,
+          totalAmount: Number(row[INVOICE_CONFIG.COLUMNS.TOTAL_AMOUNT]) || 0,
+          status: String(row[INVOICE_CONFIG.COLUMNS.STATUS]).trim(),
+          pdfUrl: String(row[INVOICE_CONFIG.COLUMNS.PDF_URL] || '').trim(),
+          rowIndex: i + 1 // Row index (1-based for Google Sheets)
         };
       }
     }
 
-    logError('getInvoiceDataById', `InvoiceID ${invoiceId} non trouvé`);
+    logError('getInvoiceDataById', `InvoiceID ${invoiceId} not found`);
     return null;
 
   } catch (error) {
-    logError('getInvoiceDataById', `Erreur lors de la récupération des données`, error);
+    logError('getInvoiceDataById', `Error retrieving data`, error);
     return null;
   }
 }
 
 /**
- * Récupère toutes les factures avec un statut spécifique
- * @param {string} statut - Le statut à rechercher (ex: "Brouillon")
- * @returns {Array} Tableau d'objets contenant les données des factures
+ * Retrieves all invoices with a specific status
+ * @param {string} status - The status to search for (e.g., "Draft")
+ * @returns {Array} Array of objects containing invoice data
  */
-function getInvoicesByStatus(statut) {
+function getInvoicesByStatus(status) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const facturesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.FACTURES);
+    const invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
 
-    if (!facturesSheet) {
-      logError('getInvoicesByStatus', 'Feuille Factures introuvable');
+    if (!invoicesSheet) {
+      logError('getInvoicesByStatus', 'Invoices sheet not found');
       return [];
     }
 
-    const data = facturesSheet.getDataRange().getValues();
+    const data = invoicesSheet.getDataRange().getValues();
     const headers = data[0];
     const invoices = [];
 
-    // Parcourt toutes les lignes (sauf l'en-tête)
+    // Loop through all rows (except header)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const currentStatut = String(row[INVOICE_CONFIG.COLUMNS.STATUT]).trim();
+      const currentStatus = String(row[INVOICE_CONFIG.COLUMNS.STATUS]).trim();
 
-      if (currentStatut === statut) {
+      if (currentStatus === status) {
         const invoiceData = {
           invoiceId: String(row[INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim(),
           date: row[INVOICE_CONFIG.COLUMNS.DATE],
-          clientNom: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NOM]),
+          clientName: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]),
           clientEmail: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_EMAIL]),
-          clientTel: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_TEL]),
-          clientAdresse: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADRESSE]),
-          designation: cleanString(row[INVOICE_CONFIG.COLUMNS.DESIGNATION]),
-          quantite: Number(row[INVOICE_CONFIG.COLUMNS.QUANTITE]) || 1,
-          prixUnitaire: Number(row[INVOICE_CONFIG.COLUMNS.PRIX_UNITAIRE]) || 0,
-          montantTotal: Number(row[INVOICE_CONFIG.COLUMNS.MONTANT_TOTAL]) || 0,
-          statut: currentStatut,
-          urlFacture: String(row[INVOICE_CONFIG.COLUMNS.URL_FACTURE] || '').trim(),
+          clientPhone: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_PHONE]),
+          clientAddress: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADDRESS]),
+          description: cleanString(row[INVOICE_CONFIG.COLUMNS.DESCRIPTION]),
+          quantity: Number(row[INVOICE_CONFIG.COLUMNS.QUANTITY]) || 1,
+          unitPrice: Number(row[INVOICE_CONFIG.COLUMNS.UNIT_PRICE]) || 0,
+          totalAmount: Number(row[INVOICE_CONFIG.COLUMNS.TOTAL_AMOUNT]) || 0,
+          status: currentStatus,
+          pdfUrl: String(row[INVOICE_CONFIG.COLUMNS.PDF_URL] || '').trim(),
           rowIndex: i + 1
         };
 
@@ -108,103 +108,103 @@ function getInvoicesByStatus(statut) {
       }
     }
 
-    logSuccess('getInvoicesByStatus', `${invoices.length} facture(s) avec statut "${statut}" trouvée(s)`);
+    logSuccess('getInvoicesByStatus', `${invoices.length} invoice(s) with status "${status}" found`);
     return invoices;
 
   } catch (error) {
-    logError('getInvoicesByStatus', `Erreur lors de la récupération des factures`, error);
+    logError('getInvoicesByStatus', `Error retrieving invoices`, error);
     return [];
   }
 }
 
 /**
- * Récupère toutes les factures en brouillon (prêtes à être générées)
- * @returns {Array} Tableau des factures avec statut "Brouillon"
+ * Retrieves all draft invoices (ready to be generated)
+ * @returns {Array} Array of invoices with status "Draft"
  */
 function getPendingInvoices() {
-  return getInvoicesByStatus(INVOICE_CONFIG.STATUTS.BROUILLON);
+  return getInvoicesByStatus(INVOICE_CONFIG.STATUSES.DRAFT);
 }
 
 // ============================================================================
-// MISE À JOUR DES DONNÉES
+// DATA UPDATE FUNCTIONS
 // ============================================================================
 
 /**
- * Met à jour le statut d'une facture et optionnellement l'URL du PDF
- * @param {string} invoiceId - L'ID de la facture à mettre à jour
- * @param {string} newStatus - Le nouveau statut
- * @param {string} pdfUrl - L'URL du PDF généré (optionnel)
- * @returns {boolean} true si la mise à jour a réussi
+ * Updates an invoice status and optionally the PDF URL
+ * @param {string} invoiceId - The invoice ID to update
+ * @param {string} newStatus - The new status
+ * @param {string} pdfUrl - The generated PDF URL (optional)
+ * @returns {boolean} true if update succeeded
  */
 function updateInvoiceStatus(invoiceId, newStatus, pdfUrl = null) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const facturesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.FACTURES);
+    const invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
 
-    if (!facturesSheet) {
-      logError('updateInvoiceStatus', 'Feuille Factures introuvable');
+    if (!invoicesSheet) {
+      logError('updateInvoiceStatus', 'Invoices sheet not found');
       return false;
     }
 
-    const data = facturesSheet.getDataRange().getValues();
+    const data = invoicesSheet.getDataRange().getValues();
 
-    // Cherche la ligne correspondant à l'InvoiceID
+    // Find the row matching the InvoiceID
     for (let i = 1; i < data.length; i++) {
       const currentInvoiceId = String(data[i][INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim();
 
       if (currentInvoiceId === String(invoiceId).trim()) {
         const rowNumber = i + 1;
 
-        // Met à jour le statut (colonne K)
-        const statusCell = facturesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.STATUT + 1);
+        // Update status (column K)
+        const statusCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.STATUS + 1);
         statusCell.setValue(newStatus);
 
-        // Met à jour l'URL si fournie (colonne L)
+        // Update URL if provided (column L)
         if (pdfUrl) {
-          const urlCell = facturesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.URL_FACTURE + 1);
+          const urlCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.PDF_URL + 1);
           urlCell.setValue(pdfUrl);
         }
 
-        logSuccess('updateInvoiceStatus', `Facture ${invoiceId} mise à jour → ${newStatus}`);
+        logSuccess('updateInvoiceStatus', `Invoice ${invoiceId} updated → ${newStatus}`);
         return true;
       }
     }
 
-    logError('updateInvoiceStatus', `InvoiceID ${invoiceId} non trouvé`);
+    logError('updateInvoiceStatus', `InvoiceID ${invoiceId} not found`);
     return false;
 
   } catch (error) {
-    logError('updateInvoiceStatus', `Erreur lors de la mise à jour`, error);
+    logError('updateInvoiceStatus', `Error during update`, error);
     return false;
   }
 }
 
 /**
- * Marque une facture comme générée
- * @param {string} invoiceId - L'ID de la facture
- * @param {string} pdfUrl - L'URL du PDF généré
- * @returns {boolean} true si la mise à jour a réussi
+ * Marks an invoice as generated
+ * @param {string} invoiceId - The invoice ID
+ * @param {string} pdfUrl - The generated PDF URL
+ * @returns {boolean} true if update succeeded
  */
 function markInvoiceAsGenerated(invoiceId, pdfUrl) {
-  return updateInvoiceStatus(invoiceId, INVOICE_CONFIG.STATUTS.GENEREE, pdfUrl);
+  return updateInvoiceStatus(invoiceId, INVOICE_CONFIG.STATUSES.GENERATED, pdfUrl);
 }
 
 /**
- * Marque une facture comme envoyée
- * @param {string} invoiceId - L'ID de la facture
- * @returns {boolean} true si la mise à jour a réussi
+ * Marks an invoice as sent
+ * @param {string} invoiceId - The invoice ID
+ * @returns {boolean} true if update succeeded
  */
 function markInvoiceAsSent(invoiceId) {
-  return updateInvoiceStatus(invoiceId, INVOICE_CONFIG.STATUTS.ENVOYEE);
+  return updateInvoiceStatus(invoiceId, INVOICE_CONFIG.STATUSES.SENT);
 }
 
 // ============================================================================
-// VALIDATION DES DONNÉES
+// DATA VALIDATION
 // ============================================================================
 
 /**
- * Valide qu'une facture contient toutes les données obligatoires
- * @param {Object} invoiceData - Les données de la facture
+ * Validates that an invoice contains all required data
+ * @param {Object} invoiceData - The invoice data
  * @returns {Object} {isValid: boolean, errors: Array}
  */
 function validateInvoiceData(invoiceData) {
@@ -212,38 +212,38 @@ function validateInvoiceData(invoiceData) {
 
   // Validation InvoiceID
   if (isEmpty(invoiceData.invoiceId)) {
-    errors.push('InvoiceID manquant');
+    errors.push('InvoiceID missing');
   }
 
   // Validation Client
-  if (isEmpty(invoiceData.clientNom)) {
-    errors.push('Nom du client manquant');
+  if (isEmpty(invoiceData.clientName)) {
+    errors.push('Client name missing');
   }
 
-  // Validation Produit/Service
-  if (isEmpty(invoiceData.designation)) {
-    errors.push('Désignation manquante');
+  // Validation Product/Service
+  if (isEmpty(invoiceData.description)) {
+    errors.push('Description missing');
   }
 
-  // Validation Quantité
-  if (!invoiceData.quantite || invoiceData.quantite <= 0) {
-    errors.push('Quantité invalide');
+  // Validation Quantity
+  if (!invoiceData.quantity || invoiceData.quantity <= 0) {
+    errors.push('Invalid quantity');
   }
 
-  // Validation Prix Unitaire
-  if (!validateAmount(invoiceData.prixUnitaire)) {
-    errors.push('Prix unitaire invalide');
+  // Validation Unit Price
+  if (!validateAmount(invoiceData.unitPrice)) {
+    errors.push('Invalid unit price');
   }
 
-  // Validation Montant Total
-  if (!validateAmount(invoiceData.montantTotal)) {
-    errors.push('Montant total invalide');
+  // Validation Total Amount
+  if (!validateAmount(invoiceData.totalAmount)) {
+    errors.push('Invalid total amount');
   }
 
-  // Validation cohérence Montant
-  const expectedTotal = invoiceData.quantite * invoiceData.prixUnitaire;
-  if (Math.abs(invoiceData.montantTotal - expectedTotal) > 0.01) {
-    errors.push(`Incohérence: Montant total (${invoiceData.montantTotal}) ≠ Quantité × Prix Unitaire (${expectedTotal})`);
+  // Validation Amount Consistency
+  const expectedTotal = invoiceData.quantity * invoiceData.unitPrice;
+  if (Math.abs(invoiceData.totalAmount - expectedTotal) > 0.01) {
+    errors.push(`Inconsistency: Total amount (${invoiceData.totalAmount}) ≠ Quantity × Unit Price (${expectedTotal})`);
   }
 
   return {
@@ -253,42 +253,42 @@ function validateInvoiceData(invoiceData) {
 }
 
 // ============================================================================
-// STATISTIQUES ET RAPPORTS
+// STATISTICS AND REPORTS
 // ============================================================================
 
 /**
- * Compte le nombre de factures par statut
- * @returns {Object} Objet avec le nombre de factures par statut
+ * Counts the number of invoices by status
+ * @returns {Object} Object with the number of invoices per status
  */
 function getInvoiceStatistics() {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const facturesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.FACTURES);
+    const invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
 
-    if (!facturesSheet) {
+    if (!invoicesSheet) {
       return null;
     }
 
-    const data = facturesSheet.getDataRange().getValues();
+    const data = invoicesSheet.getDataRange().getValues();
     const stats = {
-      total: data.length - 1, // Exclut l'en-tête
-      brouillon: 0,
-      generee: 0,
-      envoyee: 0
+      total: data.length - 1, // Excludes header
+      draft: 0,
+      generated: 0,
+      sent: 0
     };
 
     for (let i = 1; i < data.length; i++) {
-      const statut = String(data[i][INVOICE_CONFIG.COLUMNS.STATUT]).trim();
+      const status = String(data[i][INVOICE_CONFIG.COLUMNS.STATUS]).trim();
 
-      if (statut === INVOICE_CONFIG.STATUTS.BROUILLON) stats.brouillon++;
-      else if (statut === INVOICE_CONFIG.STATUTS.GENEREE) stats.generee++;
-      else if (statut === INVOICE_CONFIG.STATUTS.ENVOYEE) stats.envoyee++;
+      if (status === INVOICE_CONFIG.STATUSES.DRAFT) stats.draft++;
+      else if (status === INVOICE_CONFIG.STATUSES.GENERATED) stats.generated++;
+      else if (status === INVOICE_CONFIG.STATUSES.SENT) stats.sent++;
     }
 
     return stats;
 
   } catch (error) {
-    logError('getInvoiceStatistics', 'Erreur lors du calcul des statistiques', error);
+    logError('getInvoiceStatistics', 'Error calculating statistics', error);
     return null;
   }
 }

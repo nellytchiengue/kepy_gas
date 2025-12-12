@@ -275,53 +275,53 @@ function testAllPermissions() {
     });
   }
 
-  // Test 2: Feuille Factures
+  // Test 2: Invoices Sheet
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.FACTURES);
+    const sheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
     if (sheet) {
       results.details.push({
-        test: 'Feuille Factures',
+        test: 'Invoices Sheet',
         success: true,
         message: 'OK'
       });
     } else {
-      throw new Error('Feuille introuvable');
+      throw new Error('Sheet not found');
     }
   } catch (error) {
     results.success = false;
     results.details.push({
-      test: 'Feuille Factures',
+      test: 'Invoices Sheet',
       success: false,
       message: error.message
     });
   }
 
-  // Test 3: Feuille Parametres
+  // Test 3: Settings Sheet
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.PARAMETRES);
+    const sheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.SETTINGS);
     if (sheet) {
       results.details.push({
-        test: 'Feuille Parametres',
+        test: 'Settings Sheet',
         success: true,
         message: 'OK'
       });
     } else {
-      throw new Error('Feuille introuvable');
+      throw new Error('Sheet not found');
     }
   } catch (error) {
     results.success = false;
     results.details.push({
-      test: 'Feuille Parametres',
+      test: 'Settings Sheet',
       success: false,
       message: error.message
     });
   }
 
-  // Test 4: Accès au template Docs
+  // Test 4: Template Docs Access
   try {
-    const templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.ID_TEMPLATE_DOCS);
+    const templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
     if (templateId) {
       const template = DriveApp.getFileById(templateId);
       results.details.push({
@@ -330,7 +330,7 @@ function testAllPermissions() {
         message: `OK - ${template.getName()}`
       });
     } else {
-      throw new Error('ID template non configuré');
+      throw new Error('Template ID not configured');
     }
   } catch (error) {
     results.success = false;
@@ -341,23 +341,23 @@ function testAllPermissions() {
     });
   }
 
-  // Test 5: Accès au dossier Drive
+  // Test 5: Drive Folder Access
   try {
-    const folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.ID_DOSSIER_DRIVE);
+    const folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID);
     if (folderId) {
       const folder = DriveApp.getFolderById(folderId);
       results.details.push({
-        test: 'Dossier Drive',
+        test: 'Drive Folder',
         success: true,
         message: `OK - ${folder.getName()}`
       });
     } else {
-      throw new Error('ID dossier non configuré');
+      throw new Error('Folder ID not configured');
     }
   } catch (error) {
     results.success = false;
     results.details.push({
-      test: 'Dossier Drive',
+      test: 'Drive Folder',
       success: false,
       message: error.message
     });
