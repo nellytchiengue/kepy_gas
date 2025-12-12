@@ -108,9 +108,16 @@ function launchSetupWizard() {
     }
 
     // Final success message / Message de succès final
+    // Force UI refresh to remove "working" spinner
+    SpreadsheetApp.flush();
+
+    const reloadPrompt = lang === 'FR'
+      ? '\n\n💡 Veuillez RECHARGER la page (F5) pour voir le menu dans la langue configurée.'
+      : '\n\n💡 Please RELOAD the page (F5) to see the menu in the configured language.';
+
     ui.alert(
       messages.FINAL_TITLE,
-      messages.FINAL_MESSAGE,
+      messages.FINAL_MESSAGE + reloadPrompt,
       ui.ButtonSet.OK
     );
 
@@ -355,11 +362,31 @@ function collectCompanyInfo(lang) {
   if (emailResponse.getSelectedButton() !== ui.Button.OK) return null;
   const companyEmail = emailResponse.getResponseText().trim();
 
+  // Preferred language / Langue préférée
+  const localePrompt = lang === 'FR'
+    ? 'Choisissez la langue par défaut:\nEntrez "FR" pour Français ou "EN" pour Anglais:'
+    : 'Choose default language:\nEnter "FR" for French or "EN" for English:';
+
+  const localeResponse = ui.prompt(
+    lang === 'FR' ? 'Langue préférée' : 'Preferred Language',
+    localePrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  let preferredLocale = lang; // Default to detected language
+  if (localeResponse.getSelectedButton() === ui.Button.OK) {
+    const localeInput = localeResponse.getResponseText().trim().toUpperCase();
+    if (localeInput === 'FR' || localeInput === 'EN') {
+      preferredLocale = localeInput;
+    }
+  }
+
   return {
     name: companyName,
     address: companyAddress,
     phone: companyPhone,
-    email: companyEmail
+    email: companyEmail,
+    locale: preferredLocale
   };
 }
 
@@ -406,7 +433,8 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE, companyInfo.phone],
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL, companyInfo.email],
       [INVOICE_CONFIG.PARAM_KEYS.INVOICE_PREFIX, 'INV' + new Date().getFullYear() + '-'],
-      [INVOICE_CONFIG.PARAM_KEYS.LAST_INVOICE_NUMBER, '0']
+      [INVOICE_CONFIG.PARAM_KEYS.LAST_INVOICE_NUMBER, '0'],
+      ['LOCALE', companyInfo.locale || 'EN']  // Default language preference
     ];
 
     settingsSheet.getRange(2, 1, configData.length, 2).setValues(configData);

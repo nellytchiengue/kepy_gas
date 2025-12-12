@@ -1,246 +1,246 @@
 /**
  * @file 04_Main.js
- * @description Point d'entrée principal et interface utilisateur (menu personnalisé)
- * @version 1.0
- * @date 2025-12-11
+ * @description Main entry point and user interface (custom menu)
+ * @version 1.1 (Bilingual Edition)
+ * @date 2025-12-12
  */
 
 // ============================================================================
-// MENU PERSONNALISÉ DANS GOOGLE SHEETS
+// CUSTOM MENU IN GOOGLE SHEETS
 // ============================================================================
 
 /**
- * Crée un menu personnalisé lors de l'ouverture du Google Sheet
- * Cette fonction est automatiquement appelée par Google Sheets
+ * Creates a custom menu when opening the Google Sheet
+ * This function is automatically called by Google Sheets
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
-  ui.createMenu('📄 Factures')
-    .addItem('✨ Générer toutes les factures', 'menuGenerateAllInvoices')
-    .addItem('🔍 Générer une facture spécifique', 'menuGenerateSingleInvoice')
+  ui.createMenu(msg.MENU_TITLE)
+    .addItem(msg.MENU_GENERATE_ALL, 'menuGenerateAllInvoices')
+    .addItem(msg.MENU_GENERATE_SINGLE, 'menuGenerateSingleInvoice')
     .addSeparator()
-    .addItem('📧 Envoyer une facture par email', 'menuSendInvoiceEmail')
+    .addItem(msg.MENU_SEND_EMAIL, 'menuSendInvoiceEmail')
     .addSeparator()
-    .addItem('📊 Voir les statistiques', 'menuShowStatistics')
+    .addItem(msg.MENU_STATISTICS, 'menuShowStatistics')
     .addSeparator()
-    .addItem('⚙️ Tester les permissions', 'menuTestPermissions')
-    .addItem('ℹ️ À propos', 'menuAbout')
+    .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
+    .addItem(msg.MENU_ABOUT, 'menuAbout')
     .addToUi();
 
-  Logger.log('Menu Factures créé avec succès');
+  Logger.log('Menu created successfully');
 }
 
 // ============================================================================
-// FONCTIONS MENU - GÉNÉRATION DE FACTURES
+// MENU FUNCTIONS - INVOICE GENERATION
 // ============================================================================
 
 /**
- * Menu: Génère toutes les factures en statut "Brouillon"
+ * Menu: Generates all invoices with status "Draft"
  */
 function menuGenerateAllInvoices() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
-  // Confirmation avant génération
+  // Confirmation before generation
   const response = ui.alert(
-    'Générer les factures',
-    'Voulez-vous générer toutes les factures en brouillon ?',
+    msg.GENERATE_ALL_TITLE,
+    msg.GENERATE_ALL_CONFIRM,
     ui.ButtonSet.YES_NO
   );
 
   if (response !== ui.Button.YES) {
-    ui.alert('Opération annulée');
+    ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
 
-  // Affiche un message de traitement
-  ui.alert('Génération en cours...', 'Veuillez patienter', ui.ButtonSet.OK);
-
-  // Génère toutes les factures
+  // Generate all invoices (processing starts immediately)
   const result = generateAllPendingInvoices();
 
-  // Affiche le résultat
+  // Display result
   if (result.totalProcessed === 0) {
-    ui.alert('Information', result.message, ui.ButtonSet.OK);
+    ui.alert(msg.INFO_TITLE, result.message, ui.ButtonSet.OK);
   } else {
     const details = result.details
       .map(d => `${d.invoiceId}: ${d.success ? '✅' : '❌'} ${d.message}`)
       .join('\n');
 
     ui.alert(
-      'Résultat de la génération',
-      `${result.message}\n\nDétails:\n${details}`,
+      msg.RESULT_TITLE,
+      `${result.message}\n\n${msg.DETAILS_LABEL}\n${details}`,
       ui.ButtonSet.OK
     );
   }
 }
 
 /**
- * Menu: Génère une facture spécifique par ID
+ * Menu: Generates a specific invoice by ID
  */
 function menuGenerateSingleInvoice() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
-  // Demande l'ID de la facture
+  // Ask for invoice ID
   const response = ui.prompt(
-    'Générer une facture',
-    'Entrez l\'ID de la facture à générer (ex: F001):',
+    msg.MENU_GENERATE_SINGLE,
+    msg.ENTER_INVOICE_ID,
     ui.ButtonSet.OK_CANCEL
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('Opération annulée');
+    ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
 
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
-    ui.alert('Erreur', 'ID de facture manquant', ui.ButtonSet.OK);
+    ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
 
-  // Génère la facture
-  ui.alert('Génération en cours...', 'Veuillez patienter', ui.ButtonSet.OK);
-
+  // Generate invoice (processing starts immediately)
   const result = generateInvoiceById(invoiceId);
 
-  // Affiche le résultat
+  // Display result
   if (result.success) {
     ui.alert(
-      'Succès',
-      `${result.message}\n\nURL du PDF:\n${result.url}`,
+      msg.SUCCESS_TITLE,
+      `${result.message}\n\nPDF URL:\n${result.url}`,
       ui.ButtonSet.OK
     );
   } else {
-    ui.alert('Erreur', result.message, ui.ButtonSet.OK);
+    ui.alert(msg.ERROR_TITLE, result.message, ui.ButtonSet.OK);
   }
 }
 
 // ============================================================================
-// FONCTIONS MENU - ENVOI D'EMAILS
+// MENU FUNCTIONS - EMAIL SENDING
 // ============================================================================
 
 /**
- * Menu: Envoie une facture par email
+ * Menu: Sends an invoice by email
  */
 function menuSendInvoiceEmail() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
-  // Demande l'ID de la facture
+  // Ask for invoice ID
   const response = ui.prompt(
-    'Envoyer une facture par email',
-    'Entrez l\'ID de la facture à envoyer (ex: F001):',
+    msg.MENU_SEND_EMAIL,
+    msg.ENTER_INVOICE_ID_SEND,
     ui.ButtonSet.OK_CANCEL
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    ui.alert('Opération annulée');
+    ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
 
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
-    ui.alert('Erreur', 'ID de facture manquant', ui.ButtonSet.OK);
+    ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
 
-  // Envoie l'email
-  ui.alert('Envoi en cours...', 'Veuillez patienter', ui.ButtonSet.OK);
-
+  // Send email (processing starts immediately)
   const result = sendInvoiceEmailManually(invoiceId);
 
-  // Affiche le résultat
+  // Display result
   ui.alert(
-    result.success ? 'Succès' : 'Erreur',
+    result.success ? msg.SUCCESS_TITLE : msg.ERROR_TITLE,
     result.message,
     ui.ButtonSet.OK
   );
 }
 
 // ============================================================================
-// FONCTIONS MENU - STATISTIQUES
+// MENU FUNCTIONS - STATISTICS
 // ============================================================================
 
 /**
- * Menu: Affiche les statistiques des factures
+ * Menu: Displays invoice statistics
  */
 function menuShowStatistics() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
   const stats = getInvoiceStatistics();
 
   if (!stats) {
-    ui.alert('Erreur', 'Impossible de récupérer les statistiques', ui.ButtonSet.OK);
+    ui.alert(msg.ERROR_TITLE, msg.STATS_ERROR, ui.ButtonSet.OK);
     return;
   }
 
   const message = `
-📊 STATISTIQUES DES FACTURES
+${msg.STATS_TITLE}
 
-Total de factures: ${stats.total}
+${msg.STATS_TOTAL}: ${stats.total}
 
-Par statut:
-  📝 Brouillon: ${stats.brouillon}
-  ✅ Générée: ${stats.generee}
-  📧 Envoyée: ${stats.envoyee}
+${msg.STATS_BY_STATUS}
+  📝 ${msg.STATS_DRAFT}: ${stats.draft}
+  ✅ ${msg.STATS_GENERATED}: ${stats.generated}
+  📧 ${msg.STATS_SENT}: ${stats.sent}
   `;
 
-  ui.alert('Statistiques', message, ui.ButtonSet.OK);
+  ui.alert(msg.MENU_STATISTICS, message, ui.ButtonSet.OK);
 }
 
 // ============================================================================
-// FONCTIONS MENU - TESTS ET CONFIGURATION
+// MENU FUNCTIONS - TESTS AND CONFIGURATION
 // ============================================================================
 
 /**
- * Menu: Teste toutes les permissions nécessaires
+ * Menu: Tests all necessary permissions
  */
 function menuTestPermissions() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
   try {
-    ui.alert('Test en cours...', 'Vérification des permissions', ui.ButtonSet.OK);
+    ui.alert(msg.TEST_IN_PROGRESS, msg.TEST_VERIFYING, ui.ButtonSet.OK);
 
     const results = testAllPermissions();
 
     const message = `
-${results.success ? '✅ TOUS LES TESTS SONT PASSÉS' : '❌ CERTAINS TESTS ONT ÉCHOUÉ'}
+${results.success ? msg.TEST_SUCCESS : msg.TEST_FAILURE}
 
-Détails:
+${msg.DETAILS_LABEL}
 ${results.details.map(d => `${d.test}: ${d.success ? '✅' : '❌'} ${d.message}`).join('\n')}
     `;
 
-    ui.alert('Résultats des tests', message, ui.ButtonSet.OK);
+    ui.alert(msg.TEST_TITLE, message, ui.ButtonSet.OK);
 
   } catch (error) {
-    ui.alert('Erreur', `Erreur lors des tests: ${error.message}`, ui.ButtonSet.OK);
+    ui.alert(msg.ERROR_TITLE, `${msg.TEST_ERROR}: ${error.message}`, ui.ButtonSet.OK);
   }
 }
 
 /**
- * Menu: Affiche les informations sur le système
+ * Menu: Displays system information
  */
 function menuAbout() {
   const ui = SpreadsheetApp.getUi();
+  const msg = getUIMessages();
 
   const message = `
-📄 SYSTÈME DE GÉNÉRATION AUTOMATIQUE DE FACTURES
+${msg.ABOUT_SYSTEM}
 
-Version: 1.0
-Date: 2025-12-11
+${msg.ABOUT_VERSION}: ${INVOICE_CONFIG.APP.VERSION}
+${msg.ABOUT_DATE}: 2025-12-12
 
-Fonctionnalités:
-  ✨ Génération automatique de factures PDF
-  📧 Envoi automatique par email (optionnel)
-  📊 Statistiques et suivi
-  🔐 Validation des données
+${msg.ABOUT_FEATURES}
+  ${msg.ABOUT_FEATURE_1}
+  ${msg.ABOUT_FEATURE_2}
+  ${msg.ABOUT_FEATURE_3}
+  ${msg.ABOUT_FEATURE_4}
 
-Pour toute question, consultez le README.md
+${msg.ABOUT_README}
   `;
 
-  ui.alert('À propos', message, ui.ButtonSet.OK);
+  ui.alert(msg.ABOUT_TITLE, message, ui.ButtonSet.OK);
 }
 
 // ============================================================================

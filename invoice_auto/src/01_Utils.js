@@ -63,6 +63,20 @@ function getEntrepriseParams() {
   return getCompanyParams();
 }
 
+/**
+ * Gets the configured locale (EN or FR) from Settings
+ * Récupère la locale configurée (EN ou FR) depuis Settings
+ * @returns {string} Locale code ('EN' or 'FR')
+ */
+function getConfiguredLocale() {
+  const locale = getParam('LOCALE');
+  if (locale === 'FR') return 'FR';
+  if (locale === 'EN') return 'EN';
+
+  // Fallback to auto-detection
+  return detectUserLanguage();
+}
+
 // ============================================================================
 // DATE FORMATTING / FORMATAGE DE DATES
 // ============================================================================

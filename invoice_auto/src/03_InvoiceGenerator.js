@@ -147,25 +147,28 @@ function replaceMarkers(body, invoiceData, companyParams) {
 }
 
 // ============================================================================
-// GÉNÉRATION MULTIPLE DE FACTURES
+// MULTIPLE INVOICE GENERATION
 // ============================================================================
 
 /**
- * Génère toutes les factures en statut "Brouillon"
- * @returns {Object} Résumé de l'opération
+ * Generates invoices for all status "Draft"
+ * @returns {Object} Operation summary
  */
 function generateAllPendingInvoices() {
   try {
     const pendingInvoices = getPendingInvoices();
+    const locale = getConfiguredLocale();
+    const messages = getMessages(locale);
+    const uiMsg = getUIMessages();
 
     if (pendingInvoices.length === 0) {
-      Logger.log(INVOICE_CONFIG.MESSAGES.NO_PENDING_INVOICES);
+      Logger.log(messages.NO_PENDING_INVOICES);
       return {
         success: true,
         totalProcessed: 0,
         successful: 0,
         failed: 0,
-        message: INVOICE_CONFIG.MESSAGES.NO_PENDING_INVOICES
+        message: messages.NO_PENDING_INVOICES
       };
     }
 
@@ -177,7 +180,7 @@ function generateAllPendingInvoices() {
       details: []
     };
 
-    // Génère chaque facture
+    // Generate each invoice
     pendingInvoices.forEach(invoice => {
       const result = generateInvoiceById(invoice.invoiceId);
 
@@ -195,7 +198,7 @@ function generateAllPendingInvoices() {
       });
     });
 
-    const summaryMessage = `✅ Génération terminée: ${results.successful} réussie(s), ${results.failed} échouée(s) sur ${results.totalProcessed} facture(s)`;
+    const summaryMessage = `${uiMsg.SUMMARY_COMPLETED}: ${results.successful} ${uiMsg.SUMMARY_SUCCESS}, ${results.failed} ${uiMsg.SUMMARY_FAILED} ${uiMsg.SUMMARY_OUT_OF} ${results.totalProcessed} ${uiMsg.SUMMARY_INVOICES}`;
     results.message = summaryMessage;
 
     logSuccess('generateAllPendingInvoices', summaryMessage);
@@ -203,155 +206,158 @@ function generateAllPendingInvoices() {
     return results;
 
   } catch (error) {
-    logError('generateAllPendingInvoices', 'Erreur lors de la génération multiple', error);
+    logError('generateAllPendingInvoices', 'Error during multiple generation', error);
     return {
       success: false,
       totalProcessed: 0,
       successful: 0,
       failed: 0,
-      message: `❌ Erreur: ${error.message}`
+      message: `❌ Error: ${error.message}`
     };
   }
 }
 
 // ============================================================================
-// ENVOI D'EMAIL
+// EMAIL SENDING
 // ============================================================================
 
 /**
- * Envoie la facture par email au client
- * @param {Object} invoiceData - Les données de la facture
- * @param {GoogleAppsScript.Drive.File} pdfFile - Le fichier PDF de la facture
- * @param {Object} entrepriseParams - Les paramètres de l'entreprise
- * @returns {boolean} true si l'envoi a réussi
+ * Sends invoice by email to client
+ * @param {Object} invoiceData - The invoice data
+ * @param {GoogleAppsScript.Drive.File} pdfFile - The PDF file of the invoice
+ * @param {Object} companyParams - The company parameters
+ * @returns {boolean} true if sending succeeded
  */
-function sendInvoiceEmail(invoiceData, pdfFile, entrepriseParams) {
+function sendInvoiceEmail(invoiceData, pdfFile, companyParams) {
   try {
-    // Vérifie si le client a un email valide
+    // Validate client email
     if (!validateEmail(invoiceData.clientEmail)) {
-      logError('sendInvoiceEmail', `Email client invalide pour ${invoiceData.invoiceId}: ${invoiceData.clientEmail}`);
+      logError('sendInvoiceEmail', `Invalid client email for ${invoiceData.invoiceId}: ${invoiceData.clientEmail}`);
       return false;
     }
 
-    // Récupère l'email expéditeur
-    const senderEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.EMAIL_EXPEDITEUR);
+    // Get sender email
+    const senderEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.SENDER_EMAIL);
 
-    // Prépare le sujet et le corps de l'email
-    const subject = `Facture n°${invoiceData.invoiceId} - ${entrepriseParams.nom}`;
+    // Get email template based on configured locale
+    const emailTemplate = getEmailTemplate();
 
-    const body = `Bonjour ${invoiceData.clientNom},
+    // Prepare data object for template
+    const emailData = {
+      clientName: invoiceData.clientName,
+      invoiceId: invoiceData.invoiceId,
+      totalAmountFormatted: formatAmount(invoiceData.totalAmount),
+      dateFormatted: formatDate(invoiceData.date),
+      description: invoiceData.description,
+      quantity: invoiceData.quantity,
+      unitPriceFormatted: formatAmount(invoiceData.unitPrice),
+      companyName: companyParams.name,
+      companyPhone: companyParams.phone,
+      companyEmail: companyParams.email
+    };
 
-Veuillez trouver ci-joint votre facture n°${invoiceData.invoiceId} d'un montant de ${formatAmount(invoiceData.montantTotal)}.
+    // Generate subject and body from template
+    const subject = emailTemplate.subject(invoiceData.invoiceId, companyParams.name);
+    const body = emailTemplate.body(emailData);
 
-Détails de la facture:
-- Date: ${formatDate(invoiceData.date)}
-- Désignation: ${invoiceData.designation}
-- Quantité: ${invoiceData.quantite}
-- Prix unitaire: ${formatAmount(invoiceData.prixUnitaire)}
-
-Nous restons à votre disposition pour toute question.
-
-Cordialement,
-${entrepriseParams.nom}
-${entrepriseParams.tel}
-${entrepriseParams.email}`;
-
-    // Envoi de l'email avec la facture en pièce jointe
+    // Send email with invoice attachment
     GmailApp.sendEmail(
       invoiceData.clientEmail,
       subject,
       body,
       {
         attachments: [pdfFile.getBlob()],
-        name: entrepriseParams.nom,
+        name: companyParams.name,
         cc: senderEmail
       }
     );
 
-    // Marque la facture comme envoyée
+    // Mark invoice as sent
     markInvoiceAsSent(invoiceData.invoiceId);
 
-    logSuccess('sendInvoiceEmail', `Email envoyé à ${invoiceData.clientEmail} pour facture ${invoiceData.invoiceId}`);
+    logSuccess('sendInvoiceEmail', `Email sent to ${invoiceData.clientEmail} for invoice ${invoiceData.invoiceId}`);
     return true;
 
   } catch (error) {
-    logError('sendInvoiceEmail', `Erreur lors de l'envoi de l'email pour ${invoiceData.invoiceId}`, error);
+    logError('sendInvoiceEmail', `Error sending email for ${invoiceData.invoiceId}`, error);
     return false;
   }
 }
 
 /**
- * Envoie la facture par email manuellement (après génération)
- * @param {string} invoiceId - L'ID de la facture à envoyer
- * @returns {Object} Résultat de l'envoi
+ * Sends invoice by email manually (after generation)
+ * @param {string} invoiceId - The invoice ID to send
+ * @returns {Object} Sending result
  */
 function sendInvoiceEmailManually(invoiceId) {
   try {
     const invoiceData = getInvoiceDataById(invoiceId);
+    const locale = getConfiguredLocale();
+    const messages = getMessages(locale);
 
     if (!invoiceData) {
       return {
         success: false,
-        message: INVOICE_CONFIG.MESSAGES.ERROR_NO_DATA
+        message: messages.ERROR_NO_DATA
       };
     }
 
-    // Vérifie que la facture a déjà été générée
-    if (invoiceData.statut === INVOICE_CONFIG.STATUTS.BROUILLON) {
+    // Check that invoice has been generated
+    if (invoiceData.status === INVOICE_CONFIG.STATUSES.DRAFT) {
       return {
         success: false,
-        message: `❌ La facture ${invoiceId} n'a pas encore été générée`
+        message: `❌ Invoice ${invoiceId} has not been generated yet`
       };
     }
 
-    if (!invoiceData.urlFacture) {
+    if (!invoiceData.pdfUrl) {
       return {
         success: false,
-        message: `❌ URL du PDF manquante pour la facture ${invoiceId}`
+        message: `❌ PDF URL missing for invoice ${invoiceId}`
       };
     }
 
-    // Récupère le fichier PDF depuis l'URL
-    const pdfFile = getPdfFileFromUrl(invoiceData.urlFacture);
+    // Retrieve PDF file from URL
+    const pdfFile = getPdfFileFromUrl(invoiceData.pdfUrl);
     if (!pdfFile) {
       return {
         success: false,
-        message: `❌ Fichier PDF introuvable pour la facture ${invoiceId}`
+        message: `❌ PDF file not found for invoice ${invoiceId}`
       };
     }
 
-    const entrepriseParams = getEntrepriseParams();
-    const emailSent = sendInvoiceEmail(invoiceData, pdfFile, entrepriseParams);
+    const companyParams = getCompanyParams();
+    const emailSent = sendInvoiceEmail(invoiceData, pdfFile, companyParams);
 
     if (emailSent) {
       return {
         success: true,
-        message: INVOICE_CONFIG.MESSAGES.SUCCESS_EMAIL
+        message: messages.SUCCESS_EMAIL
       };
     } else {
       return {
         success: false,
-        message: `❌ Échec de l'envoi de l'email pour ${invoiceId}`
+        message: `❌ Failed to send email for ${invoiceId}`
       };
     }
 
   } catch (error) {
-    logError('sendInvoiceEmailManually', `Erreur lors de l'envoi manuel`, error);
+    logError('sendInvoiceEmailManually', `Error during manual sending`, error);
     return {
       success: false,
-      message: `❌ Erreur: ${error.message}`
+      message: `❌ Error: ${error.message}`
     };
   }
 }
 
 /**
- * Récupère un fichier PDF depuis son URL Drive
- * @param {string} url - L'URL du fichier sur Google Drive
- * @returns {GoogleAppsScript.Drive.File|null} Le fichier ou null
+ * Retrieves a PDF file from its Drive URL
+ * @param {string} url - The file URL on Google Drive
+ * @returns {GoogleAppsScript.Drive.File|null} The file or null
  */
 function getPdfFileFromUrl(url) {
   try {
-    // Extrait l'ID du fichier depuis l'URL
+    // Extract file ID from URL
     const fileIdMatch = url.match(/[-\w]{25,}/);
     if (!fileIdMatch) return null;
 
@@ -359,7 +365,7 @@ function getPdfFileFromUrl(url) {
     return DriveApp.getFileById(fileId);
 
   } catch (error) {
-    logError('getPdfFileFromUrl', 'Erreur lors de la récupération du PDF', error);
+    logError('getPdfFileFromUrl', 'Error retrieving PDF', error);
     return null;
   }
 }
