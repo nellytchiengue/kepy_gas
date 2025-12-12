@@ -18,7 +18,8 @@ const INVOICE_CONFIG = {
   // ---------------------------------------------------------------------------
   SHEETS: {
     INVOICES: 'Invoices',              // Sheet containing invoice data / Feuille contenant les factures
-    SETTINGS: 'Settings'               // Sheet containing configuration / Feuille de configuration
+    SETTINGS: 'Settings',               // Sheet containing configuration / Feuille de configuration
+    CLIENTS: 'Clients'                 // Sheet containing clients data / Feuille de la base des clients
   },
 
   // ---------------------------------------------------------------------------
@@ -38,6 +39,14 @@ const INVOICE_CONFIG = {
     TOTAL_AMOUNT: 9,     // Column J - Total amount = Qty × Unit Price
     STATUS: 10,          // Column K - Invoice status
     PDF_URL: 11          // Column L - Generated PDF link (auto-filled)
+  },
+
+  CLIENT_COLUMNS: {
+    CLIENT_ID: 0,
+    CLIENT_NAME: 1,
+    CLIENT_EMAIL: 2,
+    CLIENT_PHONE: 3,
+    CLIENT_ADDRESS: 4
   },
 
   // ---------------------------------------------------------------------------
