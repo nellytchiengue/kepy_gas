@@ -16,9 +16,13 @@
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   const msg = getUIMessages();
+  const lang = getConfiguredLocale();
+
+  // Nouveau label pour l'ajout de facture
+  const newInvoiceLabel = lang === 'FR' ? '➕ Nouvelle facture' : '➕ New Invoice';
 
   ui.createMenu(msg.MENU_TITLE)
-    .addItem('➕ ' + (getConfiguredLocale() === 'FR' ? 'Nouvelle facture' : 'New invoice'), 'menuAddNewInvoice')  // ← NOUVELLE LIGNE
+    .addItem(newInvoiceLabel, 'menuAddNewInvoice')  // ← NOUVEAU
     .addSeparator()
     .addItem(msg.MENU_GENERATE_ALL, 'menuGenerateAllInvoices')
     .addItem(msg.MENU_GENERATE_SINGLE, 'menuGenerateSingleInvoice')
@@ -228,19 +232,19 @@ function menuAbout() {
   const msg = getUIMessages();
 
   const message = `
-  ${msg.ABOUT_SYSTEM}
+${msg.ABOUT_SYSTEM}
 
-  ${msg.ABOUT_VERSION}: ${INVOICE_CONFIG.APP.VERSION}
-  ${msg.ABOUT_DATE}: 2025-12-12
+${msg.ABOUT_VERSION}: ${INVOICE_CONFIG.APP.VERSION}
+${msg.ABOUT_DATE}: 2025-12-12
 
-  ${msg.ABOUT_FEATURES}
-    ${msg.ABOUT_FEATURE_1}
-    ${msg.ABOUT_FEATURE_2}
-    ${msg.ABOUT_FEATURE_3}
-    ${msg.ABOUT_FEATURE_4}
+${msg.ABOUT_FEATURES}
+  ${msg.ABOUT_FEATURE_1}
+  ${msg.ABOUT_FEATURE_2}
+  ${msg.ABOUT_FEATURE_3}
+  ${msg.ABOUT_FEATURE_4}
 
-  ${msg.ABOUT_README}
-    `;
+${msg.ABOUT_README}
+  `;
 
   ui.alert(msg.ABOUT_TITLE, message, ui.ButtonSet.OK);
 }

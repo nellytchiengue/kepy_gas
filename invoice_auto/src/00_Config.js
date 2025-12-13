@@ -41,13 +41,17 @@ const INVOICE_CONFIG = {
     PDF_URL: 11          // Column L - Generated PDF link (auto-filled)
   },
 
-  CLIENT_COLUMNS: {
-    CLIENT_ID: 0,
-    CLIENT_NAME: 1,
-    CLIENT_EMAIL: 2,
-    CLIENT_PHONE: 3,
-    CLIENT_ADDRESS: 4
-  },
+
+// CLIENT COLUMN INDEXES (0-based) IN "CLIENTS" SHEET
+// INDEX DES COLONNES (base 0) DANS LA FEUILLE "CLIENTS"
+// ---------------------------------------------------------------------------
+CLIENT_COLUMNS: {
+  CLIENT_ID: 0,        // Column A - Unique client ID (ex: CLI-001)
+  CLIENT_NAME: 1,      // Column B - Client name
+  CLIENT_EMAIL: 2,     // Column C - Client email
+  CLIENT_PHONE: 3,     // Column D - Client phone
+  CLIENT_ADDRESS: 4    // Column E - Client address
+},
 
   // ---------------------------------------------------------------------------
   // COLUMN HEADERS (for validation) / EN-TÊTES DES COLONNES (pour validation)
