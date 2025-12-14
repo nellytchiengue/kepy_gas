@@ -212,9 +212,9 @@ const INVOICE_CONFIG = {
     NAME: 'InvoiceFlash',
     VERSION: '1.2',
     TAGLINE: 'One-Click Invoice Generator',
-    AUTHOR: 'Nelly Tchiengue',
+    AUTHOR: 'Nelly TCHIENGUE',
     LICENSE: 'Commercial - Single User License',
-    SUPPORT_EMAIL: 'support@invoiceflash.com'
+    SUPPORT_EMAIL: 'nelly@tpmn.app'
   }
 };
 
@@ -321,7 +321,7 @@ const UI_MESSAGES = {
     ABOUT_FEATURES: 'Features:',
     ABOUT_FEATURE_1: '✨ Automatic PDF invoice generation',
     ABOUT_FEATURE_2: '📧 Automatic email sending (optional)',
-    ABOUT_FEATURE_3: '📊 Statistics and tracking',
+    ABOUT_FEATURE_3: '📈 Statistics and tracking',
     ABOUT_FEATURE_4: '🔐 Data validation',
     ABOUT_README: 'For any questions, consult the README.md',
 
@@ -388,7 +388,7 @@ const UI_MESSAGES = {
     ABOUT_FEATURES: 'Fonctionnalités:',
     ABOUT_FEATURE_1: '✨ Génération automatique de factures PDF',
     ABOUT_FEATURE_2: '📧 Envoi automatique par email (optionnel)',
-    ABOUT_FEATURE_3: '📊 Statistiques et suivi',
+    ABOUT_FEATURE_3: '📈 Statistiques et suivi',
     ABOUT_FEATURE_4: '🔐 Validation des données',
     ABOUT_README: 'Pour toute question, consultez le README.md',
 

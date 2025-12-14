@@ -18,19 +18,21 @@ function onOpen() {
   const msg = getUIMessages();
   const lang = getConfiguredLocale();
 
-  // Nouveau label pour l'ajout de facture
+  // Label pour l'ajout de facture
   const newInvoiceLabel = lang === 'FR' ? '➕ Nouvelle facture' : '➕ New Invoice';
 
   ui.createMenu(msg.MENU_TITLE)
-    .addItem(newInvoiceLabel, 'menuAddNewInvoice')  // ← NOUVEAU
+    .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice') 
     .addSeparator()
-    .addItem(msg.MENU_GENERATE_ALL, 'menuGenerateAllInvoices')
-    .addItem(msg.MENU_GENERATE_SINGLE, 'menuGenerateSingleInvoice')
+    .addItem('2️⃣ - ' + msg.MENU_GENERATE_ALL, 'menuGenerateAllInvoices')
+    .addItem('2️⃣ - ' + msg.MENU_GENERATE_SINGLE, 'menuGenerateSingleInvoice')
     .addSeparator()
-    .addItem(msg.MENU_SEND_EMAIL, 'menuSendInvoiceEmail')
+    .addItem('3️⃣ - ' + msg.MENU_SEND_EMAIL, 'menuSendInvoiceEmail')
     .addSeparator()
     .addItem(msg.MENU_STATISTICS, 'menuShowStatistics')
     .addSeparator()
+    .addSeparator()
+    .addItem(msg.MENU_SETUP_INSTALLATION, 'launchSetupWizard')
     .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
     .addItem(msg.MENU_ABOUT, 'menuAbout')
     .addToUi();
