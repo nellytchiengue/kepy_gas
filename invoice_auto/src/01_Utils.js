@@ -396,6 +396,26 @@ function isEmpty(value) {
 }
 
 /**
+ * Forces pending Spreadsheet changes to commit and replaces the default
+ * "Working" spinner with a short toast notification. This avoids leaving the
+ * Google Sheets UI blocked after long-running scripts.
+ * @param {string} message - Optional message to display in the toast
+ */
+function showCompletionToast(message) {
+  try {
+    SpreadsheetApp.flush();
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss) {
+      const title = (INVOICE_CONFIG.APP && INVOICE_CONFIG.APP.NAME) || 'InvoiceFlash';
+      const toastMessage = message || '✅ Done';
+      ss.toast(toastMessage, title, 4);
+    }
+  } catch (error) {
+    Logger.log('showCompletionToast error: ' + error);
+  }
+}
+
+/**
  * Generates the next invoice number automatically by scanning existing invoices
  * Génère le prochain numéro de facture automatiquement en scannant les factures existantes
  * Format: INV2025-CLI-001-0009 (Prefix-ClientID-InvoiceNumber)

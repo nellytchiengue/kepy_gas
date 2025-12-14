@@ -59,6 +59,7 @@ function menuGenerateAllInvoices() {
   );
 
   if (response !== ui.Button.YES) {
+    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
@@ -66,10 +67,9 @@ function menuGenerateAllInvoices() {
   // Generate all invoices (processing starts immediately)
   const result = generateAllPendingInvoices();
 
-  // Force UI refresh to remove "Working" spinner
+  // Display result - flush to clear spinner before showing alert
   SpreadsheetApp.flush();
 
-  // Display result
   if (result.totalProcessed === 0) {
     ui.alert(msg.INFO_TITLE, result.message, ui.ButtonSet.OK);
   } else {
@@ -83,6 +83,10 @@ function menuGenerateAllInvoices() {
       ui.ButtonSet.OK
     );
   }
+
+  // Final flush after alert to ensure spinner is dismissed
+  SpreadsheetApp.flush();
+  return;
 }
 
 /**
@@ -100,6 +104,7 @@ function menuGenerateSingleInvoice() {
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
+    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
@@ -107,6 +112,7 @@ function menuGenerateSingleInvoice() {
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
+    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
@@ -114,10 +120,9 @@ function menuGenerateSingleInvoice() {
   // Generate invoice (processing starts immediately)
   const result = generateInvoiceById(invoiceId);
 
-  // Force UI refresh to remove "Working" spinner
+  // Display result - flush to clear spinner before showing alert
   SpreadsheetApp.flush();
 
-  // Display result
   if (result.success) {
     ui.alert(
       msg.SUCCESS_TITLE,
@@ -127,6 +132,10 @@ function menuGenerateSingleInvoice() {
   } else {
     ui.alert(msg.ERROR_TITLE, result.message, ui.ButtonSet.OK);
   }
+
+  // Final flush after alert to ensure spinner is dismissed
+  SpreadsheetApp.flush();
+  return;
 }
 
 // ============================================================================
@@ -148,6 +157,7 @@ function menuSendInvoiceEmail() {
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
+    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
@@ -155,6 +165,7 @@ function menuSendInvoiceEmail() {
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
+    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
@@ -162,15 +173,17 @@ function menuSendInvoiceEmail() {
   // Send email (processing starts immediately)
   const result = sendInvoiceEmailManually(invoiceId);
 
-  // Force UI refresh to remove "Working" spinner
+  // Display result - flush to clear spinner before showing alert
   SpreadsheetApp.flush();
-
-  // Display result
   ui.alert(
     result.success ? msg.SUCCESS_TITLE : msg.ERROR_TITLE,
     result.message,
     ui.ButtonSet.OK
   );
+
+  // Final flush after alert to ensure spinner is dismissed
+  SpreadsheetApp.flush();
+  return;
 }
 
 // ============================================================================
@@ -186,7 +199,7 @@ function menuShowStatistics() {
 
   const stats = getInvoiceStatistics();
 
-  // Force UI refresh to remove "Working" spinner
+  // Flush to clear spinner before showing alert
   SpreadsheetApp.flush();
 
   if (!stats) {
@@ -206,6 +219,10 @@ ${msg.STATS_BY_STATUS}
   `;
 
   ui.alert(msg.MENU_STATISTICS, message, ui.ButtonSet.OK);
+
+  // Final flush after alert to ensure spinner is dismissed
+  SpreadsheetApp.flush();
+  return;
 }
 
 // ============================================================================
@@ -220,12 +237,11 @@ function menuTestPermissions() {
   const msg = getUIMessages();
 
   try {
+    // Show initial info dialog
+    SpreadsheetApp.flush();
     ui.alert(msg.TEST_IN_PROGRESS, msg.TEST_VERIFYING, ui.ButtonSet.OK);
 
     const results = testAllPermissions();
-
-    // Force UI refresh to remove "Working" spinner
-    SpreadsheetApp.flush();
 
     const message = `
 ${results.success ? msg.TEST_SUCCESS : msg.TEST_FAILURE}
@@ -234,13 +250,19 @@ ${msg.DETAILS_LABEL}
 ${results.details.map(d => `${d.test}: ${d.success ? '✅' : '❌'} ${d.message}`).join('\n')}
     `;
 
+    // Flush to clear spinner before showing alert
+    SpreadsheetApp.flush();
     ui.alert(msg.TEST_TITLE, message, ui.ButtonSet.OK);
 
+    // Final flush after alert to ensure spinner is dismissed
+    SpreadsheetApp.flush();
+
   } catch (error) {
-    // Force UI refresh even on error
     SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, `${msg.TEST_ERROR}: ${error.message}`, ui.ButtonSet.OK);
+    SpreadsheetApp.flush();
   }
+  return;
 }
 
 /**
@@ -265,7 +287,13 @@ ${msg.ABOUT_FEATURES}
 ${msg.ABOUT_README}
   `;
 
+  // Flush to clear spinner before showing alert
+  SpreadsheetApp.flush();
   ui.alert(msg.ABOUT_TITLE, message, ui.ButtonSet.OK);
+
+  // Final flush after alert to ensure spinner is dismissed
+  SpreadsheetApp.flush();
+  return;
 }
 
 // ============================================================================

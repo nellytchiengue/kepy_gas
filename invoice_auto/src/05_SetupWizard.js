@@ -29,11 +29,13 @@ function launchSetupWizard() {
   );
 
   if (welcomeResponse !== ui.Button.YES) {
+    SpreadsheetApp.flush(); // Force UI refresh before alert
     ui.alert(messages.SETUP_CANCELLED);
     return;
   }
 
   // Step 1: Use existing template / Utiliser le template existant
+  SpreadsheetApp.flush(); // Force UI refresh before alert
   ui.alert(messages.STEP1_TITLE, messages.STEP1_MESSAGE, ui.ButtonSet.OK);
 
   try {
@@ -41,21 +43,25 @@ function launchSetupWizard() {
     const templateId = '19lus1lxI1eqNUDSdMJ-1yrCRHl87JFYUdGJ1aNVBUNA';
 
     // Step 2: Auto-detect Drive folder / Détecter automatiquement le dossier Drive
+    SpreadsheetApp.flush(); // Force UI refresh before alert
     ui.alert(messages.STEP2_TITLE, messages.STEP2_MESSAGE, ui.ButtonSet.OK);
 
     const folderId = getCurrentSpreadsheetFolder();
 
     if (!folderId) {
+      SpreadsheetApp.flush(); // Force UI refresh before alert
       ui.alert(messages.ERROR, messages.STEP2_ERROR, ui.ButtonSet.OK);
       return;
     }
 
     // Step 3: Configure Settings sheet / Configurer la feuille Settings
+    SpreadsheetApp.flush(); // Force UI refresh before alert
     ui.alert(messages.STEP3_TITLE, messages.STEP3_MESSAGE, ui.ButtonSet.OK);
 
     const companyInfo = collectCompanyInfo(lang);
 
     if (!companyInfo) {
+      SpreadsheetApp.flush(); // Force UI refresh before alert
       ui.alert(messages.ERROR, messages.STEP3_ERROR, ui.ButtonSet.OK);
       return;
     }
@@ -64,16 +70,19 @@ function launchSetupWizard() {
     const settingsConfigured = autoConfigureSettings(templateId, folderId, companyInfo);
 
     if (!settingsConfigured) {
+      SpreadsheetApp.flush(); // Force UI refresh before alert
       ui.alert(messages.ERROR, messages.STEP4_ERROR, ui.ButtonSet.OK);
       return;
     }
 
     // Step 5: Test permissions / Tester les permissions
+    SpreadsheetApp.flush(); // Force UI refresh before alert
     ui.alert(messages.STEP5_TITLE, messages.STEP5_MESSAGE, ui.ButtonSet.OK);
 
     const permissionsOk = testAllPermissions();
 
     if (!permissionsOk.success) {
+      SpreadsheetApp.flush(); // Force UI refresh before alert
       ui.alert(
         messages.PERMISSIONS_ERROR,
         messages.PERMISSIONS_ERROR_DETAIL + '\n\n' + permissionsOk.details.map(d => d.test + ': ' + d.message).join('\n'),
@@ -92,6 +101,7 @@ function launchSetupWizard() {
     if (testResponse === ui.Button.YES) {
       const testResult = createTestInvoice(companyInfo);
 
+      SpreadsheetApp.flush(); // Force UI refresh before alert
       if (testResult.success) {
         ui.alert(
           messages.SUCCESS_TITLE,
