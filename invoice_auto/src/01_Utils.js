@@ -113,7 +113,28 @@ function formatDate(date) {
  */
 function formatAmount(amount) {
   const formatted = Number(amount).toFixed(INVOICE_CONFIG.FORMAT.DECIMAL_PLACES);
-  return `${formatted} ${INVOICE_CONFIG.FORMAT.CURRENCY}`;
+  const currencySymbol = getCurrencySymbol();
+  return `${formatted} ${currencySymbol}`;
+}
+
+/**
+ * Gets the currency symbol from Settings
+ * Récupère le symbole de devise depuis Settings
+ * @returns {string} Currency symbol (default: €)
+ */
+function getCurrencySymbol() {
+  const symbol = getParam(INVOICE_CONFIG.PARAM_KEYS.CURRENCY_SYMBOL);
+  return symbol || '€'; // Default to Euro if not set
+}
+
+/**
+ * Gets the currency code from Settings
+ * Récupère le code de devise depuis Settings
+ * @returns {string} Currency code (default: EUR)
+ */
+function getCurrencyCode() {
+  const code = getParam(INVOICE_CONFIG.PARAM_KEYS.CURRENCY_CODE);
+  return code || 'EUR'; // Default to Euro if not set
 }
 
 // ============================================================================
@@ -276,8 +297,19 @@ function nombreEnToutesLettres(n) {
  */
 function validateEmail(email) {
   if (!email) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+
+  // Clean and trim email
+  const trimmedEmail = String(email).trim();
+
+  // More permissive regex that accepts:
+  // - Standard TLDs (.com, .fr, .org, etc.)
+  // - New TLDs (.app, .tech, .cloud, etc.)
+  // - Custom/internal TLDs (.appp, .local, etc.)
+  // - Subdomains (user@mail.example.com)
+  // Format: local-part@domain.tld where TLD can be 2-10 characters
+  const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,10}$/;
+
+  return emailRegex.test(trimmedEmail);
 }
 
 /**
@@ -364,33 +396,64 @@ function isEmpty(value) {
 }
 
 /**
- * Generates the next invoice number automatically
- * Génère le prochain numéro de facture automatiquement
- * @returns {string} Next invoice ID (e.g., INV2025-001)
+ * Generates the next invoice number automatically by scanning existing invoices
+ * Génère le prochain numéro de facture automatiquement en scannant les factures existantes
+ * Format: INV2025-CLI-001-0009 (Prefix-ClientID-InvoiceNumber)
+ * @param {string} clientId - Client ID (e.g., CLI-001)
+ * @returns {string} Next invoice ID (e.g., INV2025-CLI-001-0009)
  */
-function generateNextInvoiceId() {
+function generateNextInvoiceId(clientId) {
   try {
-    const prefix = getParam(INVOICE_CONFIG.PARAM_KEYS.INVOICE_PREFIX) || 'INV2025-';
-    const lastNumber = parseInt(getParam(INVOICE_CONFIG.PARAM_KEYS.LAST_INVOICE_NUMBER) || '0');
-    const nextNumber = lastNumber + 1;
-
-    // Update last invoice number in Settings
     const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const settingsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.SETTINGS);
+    const prefix = getParam(INVOICE_CONFIG.PARAM_KEYS.INVOICE_PREFIX) || 'INV2025-';
 
-    if (settingsSheet) {
-      const data = settingsSheet.getDataRange().getValues();
-      for (let i = 0; i < data.length; i++) {
-        if (String(data[i][0]).trim() === INVOICE_CONFIG.PARAM_KEYS.LAST_INVOICE_NUMBER) {
-          settingsSheet.getRange(i + 1, 2).setValue(nextNumber);
-          break;
+    // Validate clientId
+    if (!clientId || clientId.trim() === '') {
+      logError('generateNextInvoiceId', 'ClientID is required');
+      return 'INV-ERROR-NO-CLIENT-' + Date.now();
+    }
+
+    // Get Invoices sheet
+    const invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
+
+    if (!invoicesSheet) {
+      // If no Invoices sheet exists, start with 0001
+      const newInvoiceId = `${prefix}${clientId}-0001`;
+      logSuccess('generateNextInvoiceId', `No Invoices sheet found, starting with ${newInvoiceId}`);
+      return newInvoiceId;
+    }
+
+    // Get all data from column A (InvoiceID)
+    const data = invoicesSheet.getDataRange().getValues();
+    let maxNumber = 0;
+
+    // Build the pattern to search: prefix + clientId (e.g., "INV2025-CLI-001-")
+    const searchPattern = `${prefix}${clientId}-`;
+
+    // Scan all invoice IDs to find the highest number for THIS client
+    for (let i = 1; i < data.length; i++) { // Start at 1 to skip header
+      const invoiceId = String(data[i][INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim();
+
+      if (invoiceId && invoiceId.startsWith(searchPattern)) {
+        // Extract the number after the pattern (e.g., "INV2025-CLI-001-0015" → "0015" → 15)
+        const numberPart = invoiceId.substring(searchPattern.length);
+        const number = parseInt(numberPart, 10);
+
+        if (!isNaN(number) && number > maxNumber) {
+          maxNumber = number;
         }
       }
     }
 
-    // Format with leading zeros (001, 002, etc.)
-    const paddedNumber = String(nextNumber).padStart(3, '0');
-    return prefix + paddedNumber;
+    // Next number is max + 1
+    const nextNumber = maxNumber + 1;
+
+    // Format with leading zeros (0001, 0002, etc.) - now 4 digits
+    const paddedNumber = String(nextNumber).padStart(4, '0');
+    const newInvoiceId = `${prefix}${clientId}-${paddedNumber}`;
+
+    logSuccess('generateNextInvoiceId', `Generated new invoice ID: ${newInvoiceId} (max found for ${clientId}: ${maxNumber})`);
+    return newInvoiceId;
 
   } catch (error) {
     logError('generateNextInvoiceId', 'Failed to generate invoice ID', error);

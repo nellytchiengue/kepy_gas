@@ -64,6 +64,9 @@ function menuGenerateAllInvoices() {
   // Generate all invoices (processing starts immediately)
   const result = generateAllPendingInvoices();
 
+  // Force UI refresh to remove "Working" spinner
+  SpreadsheetApp.flush();
+
   // Display result
   if (result.totalProcessed === 0) {
     ui.alert(msg.INFO_TITLE, result.message, ui.ButtonSet.OK);
@@ -108,6 +111,9 @@ function menuGenerateSingleInvoice() {
 
   // Generate invoice (processing starts immediately)
   const result = generateInvoiceById(invoiceId);
+
+  // Force UI refresh to remove "Working" spinner
+  SpreadsheetApp.flush();
 
   // Display result
   if (result.success) {
@@ -154,6 +160,9 @@ function menuSendInvoiceEmail() {
   // Send email (processing starts immediately)
   const result = sendInvoiceEmailManually(invoiceId);
 
+  // Force UI refresh to remove "Working" spinner
+  SpreadsheetApp.flush();
+
   // Display result
   ui.alert(
     result.success ? msg.SUCCESS_TITLE : msg.ERROR_TITLE,
@@ -174,6 +183,9 @@ function menuShowStatistics() {
   const msg = getUIMessages();
 
   const stats = getInvoiceStatistics();
+
+  // Force UI refresh to remove "Working" spinner
+  SpreadsheetApp.flush();
 
   if (!stats) {
     ui.alert(msg.ERROR_TITLE, msg.STATS_ERROR, ui.ButtonSet.OK);
@@ -210,6 +222,9 @@ function menuTestPermissions() {
 
     const results = testAllPermissions();
 
+    // Force UI refresh to remove "Working" spinner
+    SpreadsheetApp.flush();
+
     const message = `
 ${results.success ? msg.TEST_SUCCESS : msg.TEST_FAILURE}
 
@@ -220,6 +235,8 @@ ${results.details.map(d => `${d.test}: ${d.success ? '✅' : '❌'} ${d.message}
     ui.alert(msg.TEST_TITLE, message, ui.ButtonSet.OK);
 
   } catch (error) {
+    // Force UI refresh even on error
+    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, `${msg.TEST_ERROR}: ${error.message}`, ui.ButtonSet.OK);
   }
 }
@@ -413,7 +430,12 @@ function scheduledInvoiceGeneration() {
 
     logSuccess('scheduledInvoiceGeneration', `Génération terminée: ${result.message}`);
 
+    // Force UI refresh
+    SpreadsheetApp.flush();
+
   } catch (error) {
     logError('scheduledInvoiceGeneration', 'Erreur lors de la génération planifiée', error);
+    // Force UI refresh even on error
+    SpreadsheetApp.flush();
   }
 }

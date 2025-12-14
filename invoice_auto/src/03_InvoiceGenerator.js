@@ -1,18 +1,56 @@
 /**
  * @file 03_InvoiceGenerator.js
- * @description Automatic PDF invoice generation from Google Docs template
- * @version 1.1 (Standardized)
- * @date 2025-12-11
+ * @description Automatic Google Doc and PDF invoice generation from template
+ * @version 1.2 (Google Doc + PDF with client folders)
+ * @date 2025-12-14
  */
+
+// ============================================================================
+// FOLDER MANAGEMENT / GESTION DES DOSSIERS
+// ============================================================================
+
+/**
+ * Gets or creates a subfolder for a client in the root folder
+ * Récupère ou crée un sous-dossier pour un client dans le dossier racine
+ * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder
+ * @param {string} clientName - The client name
+ * @returns {GoogleAppsScript.Drive.Folder} The client folder
+ */
+function getOrCreateClientFolder(rootFolder, clientName) {
+  try {
+    // Clean client name to make it folder-safe
+    const safeFolderName = cleanString(clientName).replace(/[^a-z0-9\s\-_]/gi, '_');
+
+    // Search for existing folder with this name
+    const existingFolders = rootFolder.getFoldersByName(safeFolderName);
+
+    if (existingFolders.hasNext()) {
+      const folder = existingFolders.next();
+      logSuccess('getOrCreateClientFolder', `Using existing folder: ${safeFolderName}`);
+      return folder;
+    }
+
+    // Create new folder if doesn't exist
+    const newFolder = rootFolder.createFolder(safeFolderName);
+    logSuccess('getOrCreateClientFolder', `Created new folder: ${safeFolderName}`);
+    return newFolder;
+
+  } catch (error) {
+    logError('getOrCreateClientFolder', `Error managing client folder for ${clientName}`, error);
+    // Fallback: return root folder if subfolder creation fails
+    return rootFolder;
+  }
+}
 
 // ============================================================================
 // INDIVIDUAL INVOICE GENERATION
 // ============================================================================
 
 /**
- * Generates a PDF invoice for a given ID
+ * Generates Google Doc and PDF invoice files for a given ID
+ * Génère les fichiers facture en Google Doc et PDF pour un ID donné
  * @param {string} invoiceId - The invoice ID to generate
- * @returns {Object} {success: boolean, message: string, url: string}
+ * @returns {Object} {success: boolean, message: string, url: string, docUrl: string, pdfUrl: string}
  */
 function generateInvoiceById(invoiceId) {
   try {
@@ -56,46 +94,50 @@ function generateInvoiceById(invoiceId) {
       };
     }
 
-    // 4. CREATE DOCUMENT FROM TEMPLATE
-    const templateFile = DriveApp.getFileById(templateId);
-    const targetFolder = DriveApp.getFolderById(folderId);
+    // 4. GET OR CREATE CLIENT SUBFOLDER
+    const rootFolder = DriveApp.getFolderById(folderId);
+    const clientFolder = getOrCreateClientFolder(rootFolder, invoiceData.clientName);
 
+    // 5. CREATE DOCUMENT FROM TEMPLATE
+    const templateFile = DriveApp.getFileById(templateId);
     const fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientName);
-    const newDocFile = templateFile.makeCopy(fileName, targetFolder);
+    const newDocFile = templateFile.makeCopy(fileName, clientFolder);
     const doc = DocumentApp.openById(newDocFile.getId());
     const body = doc.getBody();
 
-    // 5. REPLACE MARKERS
+    // 6. REPLACE MARKERS
     replaceMarkers(body, invoiceData, companyParams);
 
-    // 6. SAVE DOCUMENT
+    // 7. SAVE DOCUMENT
     doc.saveAndClose();
 
-    // 7. GENERATE PDF
-    const pdfBlob = newDocFile.getAs(MimeType.PDF).setName(fileName + '.pdf');
-    const pdfFile = targetFolder.createFile(pdfBlob);
+    // 8. GENERATE PDF (keeping Google Doc as editable version)
+    const pdfBlob = newDocFile.getAs('application/pdf').setName(fileName + '.pdf');
+    const pdfFile = clientFolder.createFile(pdfBlob);
     const pdfUrl = pdfFile.getUrl();
 
-    // 8. DELETE TEMPORARY DOCUMENT (optional)
-    newDocFile.setTrashed(true);
+    // 9. GET GOOGLE DOC URL (we keep it for editing)
+    const docUrl = newDocFile.getUrl();
 
-    // 9. UPDATE STATUS IN SHEET
+    // 10. UPDATE STATUS IN SHEET
     markInvoiceAsGenerated(invoiceData.invoiceId, pdfUrl);
 
-    // 10. SEND EMAIL (IF ENABLED)
+    // 11. SEND EMAIL (IF ENABLED)
     const autoSendEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.AUTO_SEND_EMAIL);
     if (autoSendEmail === 'true' || autoSendEmail === true) {
       sendInvoiceEmail(invoiceData, pdfFile, companyParams);
     }
 
-    logSuccess('generateInvoiceById', `Invoice ${invoiceId} generated successfully`);
+    logSuccess('generateInvoiceById', `Invoice ${invoiceId} generated successfully (Google Doc + PDF) in folder: ${invoiceData.clientName}`);
 
     const lang = detectUserLanguage();
     const messages = getMessages(lang);
     return {
       success: true,
       message: messages.SUCCESS_GENERATION,
-      url: pdfUrl
+      url: pdfUrl,
+      docUrl: docUrl,
+      pdfUrl: pdfUrl
     };
 
   } catch (error) {
@@ -119,6 +161,9 @@ function generateInvoiceById(invoiceId) {
  * @param {Object} companyParams - The company parameters
  */
 function replaceMarkers(body, invoiceData, companyParams) {
+  // Get labels in configured language
+  const labels = getInvoiceLabels();
+
   // Company Information
   body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_NAME, companyParams.name || 'N/A');
   body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_ADDRESS, companyParams.address || 'N/A');
@@ -139,11 +184,24 @@ function replaceMarkers(body, invoiceData, companyParams) {
   body.replaceText(INVOICE_CONFIG.MARKERS.DESCRIPTION, invoiceData.description);
   body.replaceText(INVOICE_CONFIG.MARKERS.QUANTITY, String(invoiceData.quantity));
   body.replaceText(INVOICE_CONFIG.MARKERS.UNIT_PRICE, formatAmount(invoiceData.unitPrice));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TVA, formatAmount(invoiceData.tva || 0));
   body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_AMOUNT, formatAmount(invoiceData.totalAmount));
 
   // Amount in Words
   const amountInWords = convertAmountToWords(invoiceData.totalAmount);
   body.replaceText(INVOICE_CONFIG.MARKERS.AMOUNT_IN_WORDS, amountInWords);
+
+  // Invoice Labels (translated according to language)
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_INVOICE, labels.LABEL_INVOICE);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_INVOICE_NUMBER, labels.LABEL_INVOICE_NUMBER);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_DATE, labels.LABEL_DATE);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_BILLED_TO, labels.LABEL_BILLED_TO);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_DESCRIPTION, labels.LABEL_DESCRIPTION);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_QTY, labels.LABEL_QTY);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_UNIT_PRICE, labels.LABEL_UNIT_PRICE);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TVA, labels.LABEL_TVA);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TOTAL, labels.LABEL_TOTAL);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_FOOTER, labels.LABEL_FOOTER);
 }
 
 // ============================================================================
@@ -357,11 +415,41 @@ function sendInvoiceEmailManually(invoiceId) {
  */
 function getPdfFileFromUrl(url) {
   try {
-    // Extract file ID from URL
-    const fileIdMatch = url.match(/[-\w]{25,}/);
-    if (!fileIdMatch) return null;
+    // Extract file ID from URL using more specific patterns for Google Drive URLs
+    // Formats:
+    // - https://drive.google.com/file/d/{FILE_ID}/view
+    // - https://drive.google.com/open?id={FILE_ID}
+    // - https://docs.google.com/file/d/{FILE_ID}/edit
 
-    const fileId = fileIdMatch[0];
+    let fileId = null;
+
+    // Try pattern: /d/{FILE_ID}/ or /d/{FILE_ID}?
+    const pattern1 = url.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+    if (pattern1) {
+      fileId = pattern1[1];
+    }
+
+    // Try pattern: id={FILE_ID} or id={FILE_ID}&
+    if (!fileId) {
+      const pattern2 = url.match(/[?&]id=([a-zA-Z0-9_-]{25,})/);
+      if (pattern2) {
+        fileId = pattern2[1];
+      }
+    }
+
+    // Fallback: extract any 25+ character alphanumeric string (original method)
+    if (!fileId) {
+      const pattern3 = url.match(/([a-zA-Z0-9_-]{25,})/);
+      if (pattern3) {
+        fileId = pattern3[1];
+      }
+    }
+
+    if (!fileId) {
+      logError('getPdfFileFromUrl', `Could not extract file ID from URL: ${url}`);
+      return null;
+    }
+
     return DriveApp.getFileById(fileId);
 
   } catch (error) {

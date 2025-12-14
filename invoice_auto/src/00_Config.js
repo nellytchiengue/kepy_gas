@@ -2,8 +2,8 @@
  * @file 00_Config.js
  * @description Centralized configuration for automatic invoice generation system
  *              Configuration centralisée pour le système de génération de factures automatiques
- * @version 1.1 (Gumroad Edition)
- * @date 2025-12-11
+ * @version 1.2 (Services Edition)
+ * @date 2025-12-13
  * @author InvoiceFlash - One-Click Invoice Generator
  */
 
@@ -19,7 +19,8 @@ const INVOICE_CONFIG = {
   SHEETS: {
     INVOICES: 'Invoices',              // Sheet containing invoice data / Feuille contenant les factures
     SETTINGS: 'Settings',               // Sheet containing configuration / Feuille de configuration
-    CLIENTS: 'Clients'                 // Sheet containing clients data / Feuille de la base des clients
+    CLIENTS: 'Clients',                // Sheet containing clients data / Feuille de la base des clients
+    SERVICES: 'Services'               // Sheet containing services/products catalog / Catalogue des services/produits
   },
 
   // ---------------------------------------------------------------------------
@@ -36,22 +37,36 @@ const INVOICE_CONFIG = {
     DESCRIPTION: 6,      // Column G - Product/service description
     QUANTITY: 7,         // Column H - Quantity sold
     UNIT_PRICE: 8,       // Column I - Unit price
-    TOTAL_AMOUNT: 9,     // Column J - Total amount = Qty × Unit Price
-    STATUS: 10,          // Column K - Invoice status
-    PDF_URL: 11          // Column L - Generated PDF link (auto-filled)
+    TVA: 9,              // Column J - TVA/VAT percentage or amount
+    TOTAL_AMOUNT: 10,    // Column K - Total amount = Qty × Unit Price + TVA
+    STATUS: 11,          // Column L - Invoice status
+    PDF_URL: 12          // Column M - Generated PDF link (auto-filled)
   },
 
+  // ---------------------------------------------------------------------------
+  // CLIENT COLUMN INDEXES (0-based) IN "CLIENTS" SHEET
+  // INDEX DES COLONNES (base 0) DANS LA FEUILLE "CLIENTS"
+  // ---------------------------------------------------------------------------
+  CLIENT_COLUMNS: {
+    CLIENT_ID: 0,        // Column A - Unique client ID (ex: CLI-001)
+    CLIENT_NAME: 1,      // Column B - Client name
+    CLIENT_EMAIL: 2,     // Column C - Client email
+    CLIENT_PHONE: 3,     // Column D - Client phone
+    CLIENT_ADDRESS: 4    // Column E - Client address
+  },
 
-// CLIENT COLUMN INDEXES (0-based) IN "CLIENTS" SHEET
-// INDEX DES COLONNES (base 0) DANS LA FEUILLE "CLIENTS"
-// ---------------------------------------------------------------------------
-CLIENT_COLUMNS: {
-  CLIENT_ID: 0,        // Column A - Unique client ID (ex: CLI-001)
-  CLIENT_NAME: 1,      // Column B - Client name
-  CLIENT_EMAIL: 2,     // Column C - Client email
-  CLIENT_PHONE: 3,     // Column D - Client phone
-  CLIENT_ADDRESS: 4    // Column E - Client address
-},
+  // ---------------------------------------------------------------------------
+  // SERVICE COLUMN INDEXES (0-based) IN "SERVICES" SHEET
+  // INDEX DES COLONNES (base 0) DANS LA FEUILLE "SERVICES"
+  // ---------------------------------------------------------------------------
+  SERVICE_COLUMNS: {
+    SERVICE_ID: 0,       // Column A - Unique service ID (ex: SRV-001)
+    SERVICE_NAME: 1,     // Column B - Service/Product name
+    DESCRIPTION: 2,      // Column C - Full description
+    DEFAULT_PRICE: 3,    // Column D - Default unit price
+    CATEGORY: 4,         // Column E - Category (optional)
+    ACTIVE: 5            // Column F - Is active (TRUE/FALSE)
+  },
 
   // ---------------------------------------------------------------------------
   // COLUMN HEADERS (for validation) / EN-TÊTES DES COLONNES (pour validation)
@@ -66,6 +81,7 @@ CLIENT_COLUMNS: {
     DESCRIPTION: 'Description',
     QUANTITY: 'Quantity',
     UNIT_PRICE: 'UnitPrice',
+    TVA: 'TVA',
     TOTAL_AMOUNT: 'TotalAmount',
     STATUS: 'Status',
     PDF_URL: 'PDFUrl'
@@ -94,7 +110,9 @@ CLIENT_COLUMNS: {
     COMPANY_PHONE: 'COMPANY_PHONE',                 // Company phone
     COMPANY_EMAIL: 'COMPANY_EMAIL',                 // Company email
     INVOICE_PREFIX: 'INVOICE_PREFIX',               // Invoice number prefix (ex: INV2025-)
-    LAST_INVOICE_NUMBER: 'LAST_INVOICE_NUMBER'      // Last used invoice number (auto-increment)
+    LAST_INVOICE_NUMBER: 'LAST_INVOICE_NUMBER',     // Last used invoice number (auto-increment)
+    CURRENCY_SYMBOL: 'CURRENCY_SYMBOL',             // Currency symbol (ex: €, $, FCFA)
+    CURRENCY_CODE: 'CURRENCY_CODE'                  // Currency code (ex: EUR, USD, XAF)
   },
 
   // ---------------------------------------------------------------------------
@@ -123,8 +141,35 @@ CLIENT_COLUMNS: {
     DESCRIPTION: '{{DESCRIPTION}}',
     QUANTITY: '{{QUANTITY}}',
     UNIT_PRICE: '{{UNIT_PRICE}}',
+    TVA: '{{TVA}}',
     TOTAL_AMOUNT: '{{TOTAL_AMOUNT}}',
-    AMOUNT_IN_WORDS: '{{AMOUNT_IN_WORDS}}'
+    AMOUNT_IN_WORDS: '{{AMOUNT_IN_WORDS}}',
+
+    // Invoice labels (translated according to language)
+    LABEL_INVOICE: '{{LABEL_INVOICE}}',
+    LABEL_INVOICE_NUMBER: '{{LABEL_INVOICE_NUMBER}}',
+    LABEL_DATE: '{{LABEL_DATE}}',
+    LABEL_BILLED_TO: '{{LABEL_BILLED_TO}}',
+    LABEL_DESCRIPTION: '{{LABEL_DESCRIPTION}}',
+    LABEL_QTY: '{{LABEL_QTY}}',
+    LABEL_UNIT_PRICE: '{{LABEL_UNIT_PRICE}}',
+    LABEL_TVA: '{{LABEL_TVA}}',
+    LABEL_TOTAL: '{{LABEL_TOTAL}}',
+    LABEL_FOOTER: '{{LABEL_FOOTER}}'
+  },
+
+  // ---------------------------------------------------------------------------
+  // SUPPORTED CURRENCIES / DEVISES SUPPORTÉES
+  // ---------------------------------------------------------------------------
+  CURRENCIES: {
+    EUR: { symbol: '€', code: 'EUR', name: 'Euro' },
+    USD: { symbol: '$', code: 'USD', name: 'US Dollar' },
+    GBP: { symbol: '£', code: 'GBP', name: 'British Pound' },
+    XAF: { symbol: 'FCFA', code: 'XAF', name: 'Franc CFA' },
+    CHF: { symbol: 'CHF', code: 'CHF', name: 'Swiss Franc' },
+    CAD: { symbol: 'CAD $', code: 'CAD', name: 'Canadian Dollar' },
+    MAD: { symbol: 'DH', code: 'MAD', name: 'Moroccan Dirham' },
+    XOF: { symbol: 'FCFA', code: 'XOF', name: 'Franc CFA (West Africa)' }
   },
 
   // ---------------------------------------------------------------------------
@@ -132,7 +177,6 @@ CLIENT_COLUMNS: {
   // ---------------------------------------------------------------------------
   FORMAT: {
     DATE_LOCALE: 'en-US',           // Date formatting locale (en-US or fr-FR)
-    CURRENCY: '$',                  // Currency symbol ($ or € or FCFA)
     DECIMAL_PLACES: 2               // Number of decimal places
   },
 
@@ -166,7 +210,7 @@ CLIENT_COLUMNS: {
   // ---------------------------------------------------------------------------
   APP: {
     NAME: 'InvoiceFlash',
-    VERSION: '1.1',
+    VERSION: '1.2',
     TAGLINE: 'One-Click Invoice Generator',
     AUTHOR: 'Nelly Tchiengue',
     LICENSE: 'Commercial - Single User License',
@@ -228,7 +272,8 @@ const UI_MESSAGES = {
     MENU_GENERATE_ALL: '✨ Generate all invoices',
     MENU_GENERATE_SINGLE: '🔍 Generate specific invoice',
     MENU_SEND_EMAIL: '📧 Send invoice by email',
-    MENU_STATISTICS: '📊 View statistics',
+    MENU_STATISTICS: '📈 View statistics',
+    MENU_SETUP_INSTALLATION: '⚙️ Settings setup for first installation',
     MENU_TEST_PERMISSIONS: '⚙️ Test permissions',
     MENU_ABOUT: 'ℹ️ About',
 
@@ -252,7 +297,7 @@ const UI_MESSAGES = {
     DETAILS_LABEL: 'Details:',
 
     // Statistics
-    STATS_TITLE: '📊 INVOICE STATISTICS',
+    STATS_TITLE: '📈 INVOICE STATISTICS',
     STATS_TOTAL: 'Total invoices',
     STATS_BY_STATUS: 'By status:',
     STATS_DRAFT: 'Draft',
@@ -294,7 +339,8 @@ const UI_MESSAGES = {
     MENU_GENERATE_ALL: '✨ Générer toutes les factures',
     MENU_GENERATE_SINGLE: '🔍 Générer une facture spécifique',
     MENU_SEND_EMAIL: '📧 Envoyer une facture par email',
-    MENU_STATISTICS: '📊 Voir les statistiques',
+    MENU_STATISTICS: '📈 Voir les statistiques',
+    MENU_SETUP_INSTALLATION: '⚙️ Mise en place des paramètres avant première utilisation',
     MENU_TEST_PERMISSIONS: '⚙️ Tester les permissions',
     MENU_ABOUT: 'ℹ️ À propos',
 
@@ -318,7 +364,7 @@ const UI_MESSAGES = {
     DETAILS_LABEL: 'Détails:',
 
     // Statistics
-    STATS_TITLE: '📊 STATISTIQUES DES FACTURES',
+    STATS_TITLE: '📈 STATISTIQUES DES FACTURES',
     STATS_TOTAL: 'Total de factures',
     STATS_BY_STATUS: 'Par statut:',
     STATS_DRAFT: 'Brouillon',
@@ -369,6 +415,51 @@ function getUIMessages() {
   // Fallback to auto-detection
   const detectedLang = detectUserLanguage();
   return UI_MESSAGES[detectedLang] || UI_MESSAGES.EN;
+}
+
+// ============================================================================
+// INVOICE LABELS (BILINGUAL)
+// ============================================================================
+
+const INVOICE_LABELS = {
+  EN: {
+    LABEL_INVOICE: 'INVOICE',
+    LABEL_INVOICE_NUMBER: 'Invoice #',
+    LABEL_DATE: 'Date',
+    LABEL_BILLED_TO: 'Billed To / Client',
+    LABEL_DESCRIPTION: 'DESCRIPTION',
+    LABEL_QTY: 'QTY',
+    LABEL_UNIT_PRICE: 'UNIT PRICE',
+    LABEL_TVA: 'VAT',
+    LABEL_TOTAL: 'LINE TOTAL',
+    LABEL_FOOTER: 'Thank you for your business.'
+  },
+
+  FR: {
+    LABEL_INVOICE: 'FACTURE',
+    LABEL_INVOICE_NUMBER: 'Facture n°',
+    LABEL_DATE: 'Date',
+    LABEL_BILLED_TO: 'Facturé à / Client',
+    LABEL_DESCRIPTION: 'DESCRIPTION',
+    LABEL_QTY: 'QTÉ',
+    LABEL_UNIT_PRICE: 'PRIX UNITAIRE',
+    LABEL_TVA: 'TVA',
+    LABEL_TOTAL: 'TOTAL',
+    LABEL_FOOTER: 'Merci pour votre confiance.'
+  }
+};
+
+/**
+ * Gets invoice labels in the configured locale
+ * @returns {Object} Labels object
+ */
+function getInvoiceLabels() {
+  const configuredLocale = getParam('LOCALE');
+  if (configuredLocale === 'EN' || configuredLocale === 'FR') {
+    return INVOICE_LABELS[configuredLocale];
+  }
+  const detectedLang = detectUserLanguage();
+  return INVOICE_LABELS[detectedLang] || INVOICE_LABELS.EN;
 }
 
 // ============================================================================

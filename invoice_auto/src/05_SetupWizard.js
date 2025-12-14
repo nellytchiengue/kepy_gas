@@ -33,21 +33,17 @@ function launchSetupWizard() {
     return;
   }
 
-  // Step 1: Create template document / Créer le document template
+  // Step 1: Use existing template / Utiliser le template existant
   ui.alert(messages.STEP1_TITLE, messages.STEP1_MESSAGE, ui.ButtonSet.OK);
 
   try {
-    const templateId = createDefaultTemplate(lang);
+    // Template ID from existing Google Docs template
+    const templateId = '19lus1lxI1eqNUDSdMJ-1yrCRHl87JFYUdGJ1aNVBUNA';
 
-    if (!templateId) {
-      ui.alert(messages.ERROR, messages.STEP1_ERROR, ui.ButtonSet.OK);
-      return;
-    }
-
-    // Step 2: Create Drive folder / Créer le dossier Drive
+    // Step 2: Auto-detect Drive folder / Détecter automatiquement le dossier Drive
     ui.alert(messages.STEP2_TITLE, messages.STEP2_MESSAGE, ui.ButtonSet.OK);
 
-    const folderId = createInvoiceFolder();
+    const folderId = getCurrentSpreadsheetFolder();
 
     if (!folderId) {
       ui.alert(messages.ERROR, messages.STEP2_ERROR, ui.ButtonSet.OK);
@@ -123,191 +119,39 @@ function launchSetupWizard() {
 
   } catch (error) {
     Logger.log('Setup Wizard Error: ' + error);
+    // Force UI refresh even on error
+    SpreadsheetApp.flush();
     ui.alert(messages.ERROR, messages.UNEXPECTED_ERROR + error.message, ui.ButtonSet.OK);
   }
 }
 
 // ============================================================================
-// STEP 1: CREATE DEFAULT TEMPLATE / CRÉER LE TEMPLATE PAR DÉFAUT
+// STEP 1 & 2: AUTO-DETECT FOLDER / DÉTECTER AUTOMATIQUEMENT LE DOSSIER
 // ============================================================================
 
 /**
- * Creates a default invoice template document
- * Crée un document template de facture par défaut
- * @param {string} lang - Language ('EN' or 'FR')
- * @returns {string|null} Template document ID or null if failed
- */
-function createDefaultTemplate(lang) {
-  try {
-    const templateContent = getDefaultTemplateContent(lang);
-    const doc = DocumentApp.create(`Invoice_Template_${lang}`);
-    const body = doc.getBody();
-
-    body.setText(templateContent);
-
-    // Apply basic formatting / Appliquer un formatage de base
-    body.editAsText().setFontSize(11).setFontFamily('Arial');
-
-    doc.saveAndClose();
-
-    Logger.log('✅ Template created: ' + doc.getId());
-    return doc.getId();
-
-  } catch (error) {
-    Logger.log('❌ Error creating template: ' + error);
-    return null;
-  }
-}
-
-/**
- * Returns the default template content based on language
- * Retourne le contenu du template par défaut selon la langue
- * @param {string} lang - Language code
- * @returns {string} Template content
- */
-function getDefaultTemplateContent(lang) {
-  if (lang === 'FR') {
-    return `
-═══════════════════════════════════════════════════════════════════════
-
-                        {{COMPANY_NAME}}
-                    {{COMPANY_ADDRESS}}
-            Tél: {{COMPANY_PHONE}} | Email: {{COMPANY_EMAIL}}
-
-═══════════════════════════════════════════════════════════════════════
-
-
-                            FACTURE N° {{INVOICE_ID}}
-
-                            Date: {{INVOICE_DATE}}
-
-
-───────────────────────────────────────────────────────────────────────
-
-INFORMATIONS CLIENT
-
-Nom:            {{CLIENT_NAME}}
-Email:          {{CLIENT_EMAIL}}
-Téléphone:      {{CLIENT_PHONE}}
-Adresse:        {{CLIENT_ADDRESS}}
-
-───────────────────────────────────────────────────────────────────────
-
-DÉTAILS DE LA FACTURE
-
-
-Désignation:            {{DESCRIPTION}}
-
-Quantité:               {{QUANTITY}}
-
-Prix Unitaire:          {{UNIT_PRICE}}
-
-
-─────────────────────────────────────────────────────────────────────
-
-MONTANT TOTAL:          {{TOTAL_AMOUNT}}
-
-─────────────────────────────────────────────────────────────────────
-
-
-Montant en lettres:
-{{AMOUNT_IN_WORDS}}
-
-
-═══════════════════════════════════════════════════════════════════════
-
-Merci de votre confiance !
-
-Conditions de paiement: Paiement à réception
-Mode de règlement accepté: Espèces, Virement bancaire, Mobile Money
-
-═══════════════════════════════════════════════════════════════════════
-
-                        [Signature et Cachet]
-    `;
-  } else {
-    return `
-═══════════════════════════════════════════════════════════════════════
-
-                        {{COMPANY_NAME}}
-                    {{COMPANY_ADDRESS}}
-            Phone: {{COMPANY_PHONE}} | Email: {{COMPANY_EMAIL}}
-
-═══════════════════════════════════════════════════════════════════════
-
-
-                            INVOICE #{{INVOICE_ID}}
-
-                            Date: {{INVOICE_DATE}}
-
-
-───────────────────────────────────────────────────────────────────────
-
-CLIENT INFORMATION
-
-Name:           {{CLIENT_NAME}}
-Email:          {{CLIENT_EMAIL}}
-Phone:          {{CLIENT_PHONE}}
-Address:        {{CLIENT_ADDRESS}}
-
-───────────────────────────────────────────────────────────────────────
-
-INVOICE DETAILS
-
-
-Description:            {{DESCRIPTION}}
-
-Quantity:               {{QUANTITY}}
-
-Unit Price:             {{UNIT_PRICE}}
-
-
-─────────────────────────────────────────────────────────────────────
-
-TOTAL AMOUNT:           {{TOTAL_AMOUNT}}
-
-─────────────────────────────────────────────────────────────────────
-
-
-Amount in words:
-{{AMOUNT_IN_WORDS}}
-
-
-═══════════════════════════════════════════════════════════════════════
-
-Thank you for your business!
-
-Payment terms: Due upon receipt
-Payment methods: Cash, Bank transfer, Credit card
-
-═══════════════════════════════════════════════════════════════════════
-
-                        [Signature]
-    `;
-  }
-}
-
-// ============================================================================
-// STEP 2: CREATE DRIVE FOLDER / CRÉER LE DOSSIER DRIVE
-// ============================================================================
-
-/**
- * Creates a folder in Google Drive for invoices
- * Crée un dossier dans Google Drive pour les factures
+ * Gets the folder ID where the current spreadsheet is located
+ * Récupère l'ID du dossier où se trouve la feuille de calcul actuelle
  * @returns {string|null} Folder ID or null if failed
  */
-function createInvoiceFolder() {
+function getCurrentSpreadsheetFolder() {
   try {
-    const year = new Date().getFullYear();
-    const folderName = `Invoices_${year}`;
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const file = DriveApp.getFileById(ss.getId());
+    const parents = file.getParents();
 
-    const folder = DriveApp.createFolder(folderName);
-
-    Logger.log('✅ Folder created: ' + folder.getId());
-    return folder.getId();
+    if (parents.hasNext()) {
+      const folder = parents.next();
+      Logger.log('✅ Folder detected: ' + folder.getName() + ' (' + folder.getId() + ')');
+      return folder.getId();
+    } else {
+      Logger.log('⚠️ Spreadsheet is in root folder (My Drive)');
+      // Return the root folder ID or create a new folder
+      return DriveApp.getRootFolder().getId();
+    }
 
   } catch (error) {
-    Logger.log('❌ Error creating folder: ' + error);
+    Logger.log('❌ Error detecting folder: ' + error);
     return null;
   }
 }
@@ -433,7 +277,9 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE, companyInfo.phone],
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL, companyInfo.email],
       [INVOICE_CONFIG.PARAM_KEYS.INVOICE_PREFIX, 'INV' + new Date().getFullYear() + '-'],
-      [INVOICE_CONFIG.PARAM_KEYS.LAST_INVOICE_NUMBER, '0'],
+      // Note: LAST_INVOICE_NUMBER no longer needed - IDs are auto-generated by scanning existing invoices
+      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_SYMBOL, '€'],
+      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_CODE, 'EUR'],
       ['LOCALE', companyInfo.locale || 'EN']  // Default language preference
     ];
 
@@ -474,7 +320,7 @@ function createTestInvoice(companyInfo) {
       const headers = [
         'InvoiceID', 'InvoiceDate', 'ClientName', 'ClientEmail',
         'ClientPhone', 'ClientAddress', 'Description', 'Quantity',
-        'UnitPrice', 'TotalAmount', 'Status', 'PDFUrl'
+        'UnitPrice', 'TVA', 'TotalAmount', 'Status', 'PDFUrl'
       ];
 
       invoicesSheet.getRange(1, 1, 1, headers.length)
@@ -485,8 +331,9 @@ function createTestInvoice(companyInfo) {
     }
 
     // Add test invoice data / Ajouter une facture de test
+    // Note: Using new format with ClientID: INV2025-CLI-001-0001
     const testData = [
-      'TEST-001',
+      'INV2025-CLI-001-0001',  // New format with ClientID
       new Date(),
       'John Doe',
       'john.doe@example.com',
@@ -495,7 +342,8 @@ function createTestInvoice(companyInfo) {
       'Test Service - Setup Validation',
       1,
       100,
-      100,
+      0,      // TVA
+      100,    // Total Amount
       INVOICE_CONFIG.STATUSES.DRAFT,
       ''
     ];
@@ -505,7 +353,7 @@ function createTestInvoice(companyInfo) {
     // Generate the test invoice / Générer la facture de test
     // Note: This requires the InvoiceGenerator functions to be updated
     // For now, just return success
-    // TODO: Call generateInvoiceById('TEST-001') once generator is updated
+    // TODO: Call generateInvoiceById('INV2025-CLI-001-0001') once generator is updated
 
     return {
       success: true,
@@ -536,16 +384,16 @@ function getSetupMessages(lang) {
   const messages = {
     EN: {
       WELCOME_TITLE: '🎉 Welcome to InvoiceFlash!',
-      WELCOME_MESSAGE: 'This wizard will help you set up your invoice system in 5 minutes.\n\nWe will:\n1. Create an invoice template\n2. Create a Drive folder\n3. Collect your company info\n4. Configure everything automatically\n5. Test the system\n\nReady to start?',
+      WELCOME_MESSAGE: 'This wizard will help you set up your invoice system in 5 minutes.\n\nWe will:\n1. Configure your existing template\n2. Detect your Drive folder automatically\n3. Collect your company info\n4. Configure everything automatically\n5. Test the system\n\nReady to start?',
       SETUP_CANCELLED: 'Setup cancelled. You can restart it anytime from the menu.',
 
-      STEP1_TITLE: '📄 Step 1/6: Creating invoice template',
-      STEP1_MESSAGE: 'We\'re creating a professional invoice template for you.\n\nClick OK to continue.',
-      STEP1_ERROR: 'Failed to create template. Please check permissions.',
+      STEP1_TITLE: '📄 Step 1/6: Configuring invoice template',
+      STEP1_MESSAGE: 'We\'re using your existing Google Docs template for invoices.\n\nClick OK to continue.',
+      STEP1_ERROR: 'Failed to access template. Please check permissions.',
 
-      STEP2_TITLE: '📁 Step 2/6: Creating Drive folder',
-      STEP2_MESSAGE: 'We\'re creating a folder to store your invoices.\n\nClick OK to continue.',
-      STEP2_ERROR: 'Failed to create folder. Please check Drive permissions.',
+      STEP2_TITLE: '📁 Step 2/6: Detecting Drive folder',
+      STEP2_MESSAGE: 'We\'re automatically detecting the folder where this spreadsheet is located.\n\nClick OK to continue.',
+      STEP2_ERROR: 'Failed to detect folder. Please check Drive permissions.',
 
       STEP3_TITLE: '🏢 Step 3/6: Company information',
       STEP3_MESSAGE: 'Please provide your company information.\n\nThis will appear on all invoices.',
@@ -580,16 +428,16 @@ function getSetupMessages(lang) {
 
     FR: {
       WELCOME_TITLE: '🎉 Bienvenue sur InvoiceFlash !',
-      WELCOME_MESSAGE: 'Cet assistant va vous aider à configurer votre système de facturation en 5 minutes.\n\nNous allons :\n1. Créer un template de facture\n2. Créer un dossier Drive\n3. Collecter vos informations\n4. Tout configurer automatiquement\n5. Tester le système\n\nPrêt à commencer ?',
+      WELCOME_MESSAGE: 'Cet assistant va vous aider à configurer votre système de facturation en 5 minutes.\n\nNous allons :\n1. Configurer votre template existant\n2. Détecter automatiquement votre dossier Drive\n3. Collecter vos informations\n4. Tout configurer automatiquement\n5. Tester le système\n\nPrêt à commencer ?',
       SETUP_CANCELLED: 'Configuration annulée. Vous pouvez la relancer depuis le menu.',
 
-      STEP1_TITLE: '📄 Étape 1/6 : Création du template',
-      STEP1_MESSAGE: 'Nous créons un template de facture professionnel pour vous.\n\nCliquez sur OK pour continuer.',
-      STEP1_ERROR: 'Échec de création du template. Vérifiez les permissions.',
+      STEP1_TITLE: '📄 Étape 1/6 : Configuration du template',
+      STEP1_MESSAGE: 'Nous utilisons votre template Google Docs existant pour les factures.\n\nCliquez sur OK pour continuer.',
+      STEP1_ERROR: 'Échec d\'accès au template. Vérifiez les permissions.',
 
-      STEP2_TITLE: '📁 Étape 2/6 : Création du dossier Drive',
-      STEP2_MESSAGE: 'Nous créons un dossier pour stocker vos factures.\n\nCliquez sur OK pour continuer.',
-      STEP2_ERROR: 'Échec de création du dossier. Vérifiez les permissions Drive.',
+      STEP2_TITLE: '📁 Étape 2/6 : Détection du dossier Drive',
+      STEP2_MESSAGE: 'Nous détectons automatiquement le dossier où se trouve cette feuille de calcul.\n\nCliquez sur OK pour continuer.',
+      STEP2_ERROR: 'Échec de détection du dossier. Vérifiez les permissions Drive.',
 
       STEP3_TITLE: '🏢 Étape 3/6 : Informations entreprise',
       STEP3_MESSAGE: 'Veuillez fournir les informations de votre entreprise.\n\nElles apparaîtront sur toutes vos factures.',
