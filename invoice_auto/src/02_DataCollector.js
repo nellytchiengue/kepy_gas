@@ -132,7 +132,27 @@ function getPendingInvoices() {
 // ============================================================================
 
 /**
+ * Formats a date as a fixed datetime string (language-independent)
+ * Format: YYYYMMDD HHMMSS (e.g., "20251214 225003")
+ * @param {Date} date - The date to format
+ * @returns {string} Formatted datetime
+ */
+function formatDateTime(date) {
+  if (!date) date = new Date();
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  const seconds = String(date.getSeconds()).padStart(2, '0');
+
+  return `${year}${month}${day} ${hours}${minutes}${seconds}`;
+}
+
+/**
  * Updates an invoice status and optionally the PDF URL
+ * Also updates the corresponding date column (GeneratedAt or SentAt)
  * @param {string} invoiceId - The invoice ID to update
  * @param {string} newStatus - The new status
  * @param {string} pdfUrl - The generated PDF URL (optional)
@@ -149,6 +169,7 @@ function updateInvoiceStatus(invoiceId, newStatus, pdfUrl = null) {
     }
 
     const data = invoicesSheet.getDataRange().getValues();
+    const now = formatDateTime(new Date());
 
     // Find the row matching the InvoiceID
     for (let i = 1; i < data.length; i++) {
@@ -157,17 +178,26 @@ function updateInvoiceStatus(invoiceId, newStatus, pdfUrl = null) {
       if (currentInvoiceId === String(invoiceId).trim()) {
         const rowNumber = i + 1;
 
-        // Update status (column K)
+        // Update status
         const statusCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.STATUS + 1);
         statusCell.setValue(newStatus);
 
-        // Update URL if provided (column L)
+        // Update URL if provided
         if (pdfUrl) {
           const urlCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.PDF_URL + 1);
           urlCell.setValue(pdfUrl);
         }
 
-        logSuccess('updateInvoiceStatus', `Invoice ${invoiceId} updated → ${newStatus}`);
+        // Update the corresponding date column based on status
+        if (newStatus === INVOICE_CONFIG.STATUSES.GENERATED) {
+          const generatedAtCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.GENERATED_AT + 1);
+          generatedAtCell.setValue(now);
+        } else if (newStatus === INVOICE_CONFIG.STATUSES.SENT) {
+          const sentAtCell = invoicesSheet.getRange(rowNumber, INVOICE_CONFIG.COLUMNS.SENT_AT + 1);
+          sentAtCell.setValue(now);
+        }
+
+        logSuccess('updateInvoiceStatus', `Invoice ${invoiceId} updated → ${newStatus} at ${now}`);
         return true;
       }
     }

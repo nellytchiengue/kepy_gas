@@ -40,7 +40,10 @@ const INVOICE_CONFIG = {
     TVA: 9,              // Column J - TVA/VAT percentage or amount
     TOTAL_AMOUNT: 10,    // Column K - Total amount = Qty × Unit Price + TVA
     STATUS: 11,          // Column L - Invoice status
-    PDF_URL: 12          // Column M - Generated PDF link (auto-filled)
+    PDF_URL: 12,         // Column M - Generated PDF link (auto-filled)
+    CREATED_AT: 13,      // Column N - Date/time when invoice was created (Draft)
+    GENERATED_AT: 14,    // Column O - Date/time when invoice was generated (PDF)
+    SENT_AT: 15          // Column P - Date/time when invoice was sent by email
   },
 
   // ---------------------------------------------------------------------------
@@ -84,7 +87,10 @@ const INVOICE_CONFIG = {
     TVA: 'TVA',
     TOTAL_AMOUNT: 'TotalAmount',
     STATUS: 'Status',
-    PDF_URL: 'PDFUrl'
+    PDF_URL: 'PDFUrl',
+    CREATED_AT: 'CreatedAt',
+    GENERATED_AT: 'GeneratedAt',
+    SENT_AT: 'SentAt'
   },
 
   // ---------------------------------------------------------------------------

@@ -20,6 +20,8 @@ function menuSendEmail() {
     .setHeight(750);
   const title = getConfiguredLocale() === 'FR' ? 'Envoyer une facture par email' : 'Send Invoice by Email';
   SpreadsheetApp.getUi().showModalDialog(html, title);
+  // Force UI refresh to remove spinner after dialog closes
+  SpreadsheetApp.flush();
 }
 
 // ============================================================================

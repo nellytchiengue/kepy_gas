@@ -112,6 +112,8 @@ function menuAddNewInvoice() {
     .setHeight(820);
   const title = getConfiguredLocale() === 'FR' ? 'Nouvelle Facture' : 'New Invoice';
   SpreadsheetApp.getUi().showModalDialog(html, title);
+  // Force UI refresh to remove spinner after dialog closes
+  SpreadsheetApp.flush();
 }
 
 function getNewInvoiceFormHtml() {
@@ -454,11 +456,30 @@ function createNewInvoice(clientInfo, description, quantity, unitPrice, tva) {
     var invoiceId = generateNextInvoiceId(clientInfo.id);
     var tvaAmount = tva || 0;
     var totalAmount = (quantity * unitPrice) + tvaAmount;
+    var createdAt = formatDateTime(new Date());
 
-    var newRow = [invoiceId, new Date(), clientInfo.name, clientInfo.email, clientInfo.phone, clientInfo.address, description, quantity, unitPrice, tvaAmount, totalAmount, INVOICE_CONFIG.STATUSES.DRAFT, ''];
+    // Row data: InvoiceID, Date, Client info, Description, Qty, Price, TVA, Total, Status, PDFUrl, CreatedAt, GeneratedAt, SentAt
+    var newRow = [
+      invoiceId,
+      new Date(),
+      clientInfo.name,
+      clientInfo.email,
+      clientInfo.phone,
+      clientInfo.address,
+      description,
+      quantity,
+      unitPrice,
+      tvaAmount,
+      totalAmount,
+      INVOICE_CONFIG.STATUSES.DRAFT,
+      '',           // PDFUrl (empty)
+      createdAt,    // CreatedAt
+      '',           // GeneratedAt (empty)
+      ''            // SentAt (empty)
+    ];
     invoicesSheet.appendRow(newRow);
 
-    logSuccess('createNewInvoice', 'Facture ' + invoiceId + ' créée pour client ' + clientInfo.id);
+    logSuccess('createNewInvoice', 'Facture ' + invoiceId + ' créée pour client ' + clientInfo.id + ' at ' + createdAt);
     return { success: true, invoiceId: invoiceId, message: 'OK' };
   } catch (error) {
     logError('createNewInvoice', 'Erreur', error);

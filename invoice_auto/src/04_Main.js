@@ -24,6 +24,9 @@ function onOpen() {
   // Label pour la generation de factures
   const generateLabel = lang === 'FR' ? '📄 Generer des factures' : '📄 Generate Invoices';
 
+  // Label pour changer de langue (affiche l'autre langue disponible)
+  const changeLangLabel = lang === 'FR' ? '🌐 Switch to English' : '🌐 Passer en Francais';
+
   ui.createMenu(msg.MENU_TITLE)
     .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice')
     .addSeparator()
@@ -31,9 +34,10 @@ function onOpen() {
     .addSeparator()
     .addItem('3️⃣ - ' + msg.MENU_SEND_EMAIL, 'menuSendEmail')
     .addSeparator()
-    .addItem(msg.MENU_STATISTICS, 'menuShowStatistics')
+    .addItem(msg.MENU_STATISTICS, 'menuStatistics')
     .addSeparator()
     .addSeparator()
+    .addItem(changeLangLabel, 'menuChangeLanguage')
     .addItem(msg.MENU_SETUP_INSTALLATION, 'launchSetupWizard')
     .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
     .addItem(msg.MENU_ABOUT, 'menuAbout')
@@ -296,6 +300,83 @@ ${msg.ABOUT_README}
   // Final flush after alert to ensure spinner is dismissed
   SpreadsheetApp.flush();
   return;
+}
+
+// ============================================================================
+// MENU FUNCTIONS - LANGUAGE CHANGE
+// ============================================================================
+
+/**
+ * Menu: Changes the application language (FR <-> EN)
+ * Updates the LOCALE parameter in Settings sheet
+ */
+function menuChangeLanguage() {
+  const ui = SpreadsheetApp.getUi();
+  const currentLang = getConfiguredLocale();
+  const newLang = currentLang === 'FR' ? 'EN' : 'FR';
+
+  // Update LOCALE in Settings sheet
+  const success = updateSettingsParam('LOCALE', newLang);
+
+  SpreadsheetApp.flush();
+
+  if (success) {
+    const message = newLang === 'FR'
+      ? 'Langue changee en Francais.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
+      : 'Language changed to English.\n\nPlease RELOAD the page (F5) to apply changes.';
+
+    const title = newLang === 'FR' ? 'Langue mise a jour' : 'Language Updated';
+
+    ui.alert(title, message, ui.ButtonSet.OK);
+  } else {
+    const errorMsg = currentLang === 'FR'
+      ? 'Erreur lors du changement de langue. Verifiez la feuille Settings.'
+      : 'Error changing language. Check the Settings sheet.';
+
+    ui.alert('Error', errorMsg, ui.ButtonSet.OK);
+  }
+
+  SpreadsheetApp.flush();
+  return;
+}
+
+/**
+ * Updates a parameter in the Settings sheet
+ * @param {string} key - The parameter key
+ * @param {string} value - The new value
+ * @returns {boolean} true if update succeeded
+ */
+function updateSettingsParam(key, value) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const settingsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.SETTINGS);
+
+    if (!settingsSheet) {
+      logError('updateSettingsParam', 'Settings sheet not found');
+      return false;
+    }
+
+    const data = settingsSheet.getDataRange().getValues();
+
+    // Find the row with the key
+    for (let i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        // Update the value in column B
+        settingsSheet.getRange(i + 1, 2).setValue(value);
+        logSuccess('updateSettingsParam', `${key} updated to ${value}`);
+        return true;
+      }
+    }
+
+    // Key not found, add it at the end
+    settingsSheet.appendRow([key, value]);
+    logSuccess('updateSettingsParam', `${key} added with value ${value}`);
+    return true;
+
+  } catch (error) {
+    logError('updateSettingsParam', 'Error updating parameter', error);
+    return false;
+  }
 }
 
 // ============================================================================

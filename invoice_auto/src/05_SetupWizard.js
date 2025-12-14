@@ -326,11 +326,12 @@ function createTestInvoice(companyInfo) {
     if (!invoicesSheet) {
       invoicesSheet = ss.insertSheet(INVOICE_CONFIG.SHEETS.INVOICES);
 
-      // Add headers / Ajouter les en-têtes
+      // Add headers / Ajouter les en-têtes (including new date columns)
       const headers = [
         'InvoiceID', 'InvoiceDate', 'ClientName', 'ClientEmail',
         'ClientPhone', 'ClientAddress', 'Description', 'Quantity',
-        'UnitPrice', 'TVA', 'TotalAmount', 'Status', 'PDFUrl'
+        'UnitPrice', 'TVA', 'TotalAmount', 'Status', 'PDFUrl',
+        'CreatedAt', 'GeneratedAt', 'SentAt'
       ];
 
       invoicesSheet.getRange(1, 1, 1, headers.length)
@@ -342,6 +343,7 @@ function createTestInvoice(companyInfo) {
 
     // Add test invoice data / Ajouter une facture de test
     // Note: Using new format with ClientID: INV2025-CLI-001-0001
+    const createdAt = formatDateTime(new Date());
     const testData = [
       'INV2025-CLI-001-0001',  // New format with ClientID
       new Date(),
@@ -352,10 +354,13 @@ function createTestInvoice(companyInfo) {
       'Test Service - Setup Validation',
       1,
       100,
-      0,      // TVA
-      100,    // Total Amount
+      0,         // TVA
+      100,       // Total Amount
       INVOICE_CONFIG.STATUSES.DRAFT,
-      ''
+      '',        // PDFUrl
+      createdAt, // CreatedAt
+      '',        // GeneratedAt
+      ''         // SentAt
     ];
 
     invoicesSheet.appendRow(testData);

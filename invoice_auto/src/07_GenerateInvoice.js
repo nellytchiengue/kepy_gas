@@ -20,6 +20,8 @@ function menuGenerateInvoices() {
     .setHeight(650);
   const title = getConfiguredLocale() === 'FR' ? 'Generer des factures' : 'Generate Invoices';
   SpreadsheetApp.getUi().showModalDialog(html, title);
+  // Force UI refresh to remove spinner after dialog closes
+  SpreadsheetApp.flush();
 }
 
 // ============================================================================
