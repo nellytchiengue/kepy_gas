@@ -21,13 +21,15 @@ function onOpen() {
   // Label pour l'ajout de facture
   const newInvoiceLabel = lang === 'FR' ? '➕ Nouvelle facture' : '➕ New Invoice';
 
+  // Label pour la generation de factures
+  const generateLabel = lang === 'FR' ? '📄 Generer des factures' : '📄 Generate Invoices';
+
   ui.createMenu(msg.MENU_TITLE)
-    .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice') 
+    .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice')
     .addSeparator()
-    .addItem('2️⃣ - ' + msg.MENU_GENERATE_ALL, 'menuGenerateAllInvoices')
-    .addItem('2️⃣ - ' + msg.MENU_GENERATE_SINGLE, 'menuGenerateSingleInvoice')
+    .addItem('2️⃣ - ' + generateLabel, 'menuGenerateInvoices')
     .addSeparator()
-    .addItem('3️⃣ - ' + msg.MENU_SEND_EMAIL, 'menuSendInvoiceEmail')
+    .addItem('3️⃣ - ' + msg.MENU_SEND_EMAIL, 'menuSendEmail')
     .addSeparator()
     .addItem(msg.MENU_STATISTICS, 'menuShowStatistics')
     .addSeparator()
