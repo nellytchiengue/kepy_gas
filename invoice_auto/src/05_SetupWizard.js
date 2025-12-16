@@ -185,7 +185,7 @@ function collectCompanyInfo(lang) {
   // COUNTRY SELECTION / SELECTION DU PAYS
   // ===========================================================================
   const countryPrompt = lang === 'FR'
-    ? 'Dans quel pays votre entreprise est-elle enregistree?\n\nEntrez:\n• "FR" pour France\n• "CM" pour Cameroun\n• "US" pour Etats-Unis'
+    ? 'Dans quel pays votre entreprise est-elle enregistrée ?\n\nEntrez :\n• "FR" pour France\n• "CM" pour Cameroun\n• "US" pour États-Unis'
     : 'In which country is your company registered?\n\nEnter:\n• "FR" for France\n• "CM" for Cameroon\n• "US" for United States';
 
   const countryResponse = ui.prompt(
@@ -256,11 +256,11 @@ function collectCompanyInfo(lang) {
   // PREFERRED LANGUAGE / LANGUE PREFEREE
   // ===========================================================================
   const localePrompt = lang === 'FR'
-    ? 'Choisissez la langue par defaut:\nEntrez "FR" pour Francais ou "EN" pour Anglais:'
+    ? 'Choisissez la langue par défaut :\nEntrez "FR" pour Français ou "EN" pour Anglais :'
     : 'Choose default language:\nEnter "FR" for French or "EN" for English:';
 
   const localeResponse = ui.prompt(
-    lang === 'FR' ? 'Langue preferee' : 'Preferred Language',
+    lang === 'FR' ? 'Langue préférée' : 'Preferred Language',
     localePrompt,
     ui.ButtonSet.OK_CANCEL
   );
@@ -323,7 +323,7 @@ function collectFrenchLegalIds(ui, isFrench) {
 
   // SIRET (MANDATORY for France)
   const siretPrompt = isFrench
-    ? 'Numero SIRET (14 chiffres - OBLIGATOIRE):\nExemple: 12345678901234'
+    ? 'Numéro SIRET (14 chiffres - OBLIGATOIRE) :\nExemple : 12345678901234'
     : 'SIRET Number (14 digits - REQUIRED):\nExample: 12345678901234';
 
   const siretResponse = ui.prompt(
@@ -338,7 +338,7 @@ function collectFrenchLegalIds(ui, isFrench) {
 
   // Auto-entrepreneur status
   const autoEntrepreneurPrompt = isFrench
-    ? 'Etes-vous auto-entrepreneur/micro-entrepreneur?\n\nEntrez "OUI" ou "NON":\n(Si OUI, la mention TVA non applicable sera ajoutee)'
+    ? 'Êtes-vous auto-entrepreneur/micro-entrepreneur ?\n\nEntrez "OUI" ou "NON" :\n(Si OUI, la mention TVA non applicable sera ajoutée)'
     : 'Are you an auto-entrepreneur/micro-entrepreneur?\n\nEnter "YES" or "NO":\n(If YES, VAT exemption notice will be added)';
 
   const autoResponse = ui.prompt(
@@ -358,7 +358,7 @@ function collectFrenchLegalIds(ui, isFrench) {
   if (!result.isAutoEntrepreneur) {
     // TVA Intracommunautaire
     const vatPrompt = isFrench
-      ? 'Numero TVA Intracommunautaire (optionnel):\nExemple: FR12345678901'
+      ? 'Numéro TVA Intracommunautaire (optionnel) :\nExemple : FR12345678901'
       : 'EU VAT Number (optional):\nExample: FR12345678901';
 
     const vatResponse = ui.prompt(
@@ -373,7 +373,7 @@ function collectFrenchLegalIds(ui, isFrench) {
 
     // RCS
     const rcsPrompt = isFrench
-      ? 'RCS (Registre du Commerce - optionnel):\nExemple: Paris B 123 456 789'
+      ? 'RCS (Registre du Commerce - optionnel) :\nExemple : Paris B 123 456 789'
       : 'Trade Register (RCS - optional):\nExample: Paris B 123 456 789';
 
     const rcsResponse = ui.prompt(
@@ -388,7 +388,7 @@ function collectFrenchLegalIds(ui, isFrench) {
 
     // Capital social
     const capitalPrompt = isFrench
-      ? 'Capital social (optionnel):\nExemple: 10 000 EUR'
+      ? 'Capital social (optionnel) :\nExemple : 10 000 EUR'
       : 'Share Capital (optional):\nExample: 10,000 EUR';
 
     const capitalResponse = ui.prompt(
@@ -403,7 +403,7 @@ function collectFrenchLegalIds(ui, isFrench) {
 
     // Forme juridique
     const legalFormPrompt = isFrench
-      ? 'Forme juridique (optionnel):\nExemples: SARL, SAS, EURL, SA'
+      ? 'Forme juridique (optionnel) :\nExemples : SARL, SAS, EURL, SA'
       : 'Legal Form (optional):\nExamples: SARL, SAS, EURL, SA';
 
     const legalFormResponse = ui.prompt(
@@ -431,7 +431,7 @@ function collectCameroonLegalIds(ui, isFrench) {
 
   // NIU (MANDATORY for Cameroon)
   const niuPrompt = isFrench
-    ? 'Numero d\'Identification Unique (NIU - OBLIGATOIRE):\nExemple: M012345678901A'
+    ? 'Numéro d\'Identification Unique (NIU - OBLIGATOIRE) :\nExemple : M012345678901A'
     : 'Tax Identification Number (NIU - REQUIRED):\nExample: M012345678901A';
 
   const niuResponse = ui.prompt(
@@ -446,7 +446,7 @@ function collectCameroonLegalIds(ui, isFrench) {
 
   // RCCM (MANDATORY for Cameroon)
   const rccmPrompt = isFrench
-    ? 'Numero RCCM (OBLIGATOIRE):\nExemple: RC/DLA/2023/B/1234'
+    ? 'Numéro RCCM (OBLIGATOIRE) :\nExemple : RC/DLA/2023/B/1234'
     : 'Trade Register Number (RCCM - REQUIRED):\nExample: RC/DLA/2023/B/1234';
 
   const rccmResponse = ui.prompt(
@@ -461,11 +461,11 @@ function collectCameroonLegalIds(ui, isFrench) {
 
   // Tax Center (MANDATORY for Cameroon)
   const taxCenterPrompt = isFrench
-    ? 'Centre des impots de rattachement (OBLIGATOIRE):\nExemple: CSI Douala-Bonanjo'
+    ? 'Centre des impôts de rattachement (OBLIGATOIRE) :\nExemple : CSI Douala-Bonanjo'
     : 'Tax Center (REQUIRED):\nExample: CSI Douala-Bonanjo';
 
   const taxCenterResponse = ui.prompt(
-    isFrench ? 'Centre des Impots' : 'Tax Center',
+    isFrench ? 'Centre des Impôts' : 'Tax Center',
     taxCenterPrompt,
     ui.ButtonSet.OK_CANCEL
   );
@@ -488,7 +488,7 @@ function collectUSLegalIds(ui, isFrench) {
 
   // EIN (Optional but recommended)
   const einPrompt = isFrench
-    ? 'EIN - Employer Identification Number (optionnel):\nExemple: 12-3456789'
+    ? 'EIN - Employer Identification Number (optionnel) :\nExemple : 12-3456789'
     : 'EIN - Employer Identification Number (optional):\nExample: 12-3456789';
 
   const einResponse = ui.prompt(
@@ -503,7 +503,7 @@ function collectUSLegalIds(ui, isFrench) {
 
   // State Tax ID (Optional)
   const stateIdPrompt = isFrench
-    ? 'Numero d\'identification fiscale de l\'Etat (optionnel):\nExemple: CA-123456789'
+    ? 'Numéro d\'identification fiscale de l\'État (optionnel) :\nExemple : CA-123456789'
     : 'State Tax ID (optional):\nExample: CA-123456789';
 
   const stateIdResponse = ui.prompt(
@@ -518,7 +518,7 @@ function collectUSLegalIds(ui, isFrench) {
 
   // Sales Tax Rate (Optional)
   const salesTaxPrompt = isFrench
-    ? 'Taux de taxe de vente en % (optionnel):\nExemple: 8.25 pour 8.25%\n(Laissez vide si pas de taxe)'
+    ? 'Taux de taxe de vente en % (optionnel) :\nExemple : 8.25 pour 8.25%\n(Laissez vide si pas de taxe)'
     : 'Sales Tax Rate in % (optional):\nExample: 8.25 for 8.25%\n(Leave empty if no sales tax)';
 
   const salesTaxResponse = ui.prompt(
@@ -555,11 +555,11 @@ function collectBankDetails(ui, lang) {
 
   // Ask if user wants to add bank details
   const askBankPrompt = isFrench
-    ? 'Voulez-vous ajouter vos coordonnees bancaires?\n(Elles apparaitront sur les factures)'
+    ? 'Voulez-vous ajouter vos coordonnées bancaires ?\n(Elles apparaîtront sur les factures)'
     : 'Do you want to add your bank details?\n(They will appear on invoices)';
 
   const askBankResponse = ui.alert(
-    isFrench ? 'Coordonnees Bancaires' : 'Bank Details',
+    isFrench ? 'Coordonnées Bancaires' : 'Bank Details',
     askBankPrompt,
     ui.ButtonSet.YES_NO
   );
@@ -570,7 +570,7 @@ function collectBankDetails(ui, lang) {
 
   // Bank Name
   const bankNamePrompt = isFrench
-    ? 'Nom de la banque:\nExemple: BNP Paribas'
+    ? 'Nom de la banque :\nExemple : BNP Paribas'
     : 'Bank Name:\nExample: Chase Bank';
 
   const bankNameResponse = ui.prompt(
@@ -585,7 +585,7 @@ function collectBankDetails(ui, lang) {
 
   // IBAN
   const ibanPrompt = isFrench
-    ? 'IBAN:\nExemple: FR76 1234 5678 9012 3456 7890 123'
+    ? 'IBAN :\nExemple : FR76 1234 5678 9012 3456 7890 123'
     : 'IBAN:\nExample: FR76 1234 5678 9012 3456 7890 123';
 
   const ibanResponse = ui.prompt(
@@ -600,7 +600,7 @@ function collectBankDetails(ui, lang) {
 
   // BIC/SWIFT
   const bicPrompt = isFrench
-    ? 'BIC/SWIFT:\nExemple: BNPAFRPP'
+    ? 'BIC/SWIFT :\nExemple : BNPAFRPP'
     : 'BIC/SWIFT:\nExample: BNPAFRPP';
 
   const bicResponse = ui.prompt(
@@ -615,7 +615,7 @@ function collectBankDetails(ui, lang) {
 
   // Account Holder Name
   const accountNamePrompt = isFrench
-    ? 'Titulaire du compte:\nExemple: SARL Mon Entreprise'
+    ? 'Titulaire du compte :\nExemple : SARL Mon Entreprise'
     : 'Account Holder Name:\nExample: My Company LLC';
 
   const accountNameResponse = ui.prompt(
@@ -744,6 +744,14 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
     configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_TERMS, paymentTerms.terms]);
     configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_DAYS, paymentTerms.days.toString()]);
 
+    // Initialize custom footer settings (will be generated after save)
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.USE_CUSTOM_FOOTER, 'TRUE']);
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.LEGAL_FOOTER_CUSTOM, '']);
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_DETAILS_CUSTOM, '']);
+
+    // Folder organization - parent folder for all client documents
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.DOCUMENTS_FOLDER_NAME, 'DOCUMENTS']);
+
     // Write all data to sheet
     settingsSheet.getRange(2, 1, configData.length, 2).setValues(configData);
 
@@ -752,6 +760,11 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
 
     // Add section separators for readability
     formatSettingsSheet(settingsSheet);
+
+    // Generate and save the legal footer based on collected info
+    // This must be done AFTER all settings are saved
+    SpreadsheetApp.flush(); // Ensure all data is written
+    generateAndSaveLegalFooterToSettings(null, companyInfo.locale);
 
     Logger.log('Settings sheet configured for country: ' + companyInfo.country);
     return true;
@@ -792,7 +805,7 @@ function getDefaultPaymentTermsForCountry(country, locale) {
   switch (country) {
     case 'FR':
       return {
-        terms: isFrench ? 'Paiement a reception' : 'Payment upon receipt',
+        terms: isFrench ? 'Paiement à réception' : 'Payment upon receipt',
         days: 30
       };
     case 'CM':
@@ -807,7 +820,7 @@ function getDefaultPaymentTermsForCountry(country, locale) {
       };
     default:
       return {
-        terms: isFrench ? 'Paiement a reception' : 'Payment upon receipt',
+        terms: isFrench ? 'Paiement à réception' : 'Payment upon receipt',
         days: 30
       };
   }
@@ -999,10 +1012,10 @@ function getSetupMessages(lang) {
       TEST_INVOICE_URL: 'Facture de test créée !\n\nConsultez-la : ',
       TEST_INVOICE_ERROR: 'Échec de création de la facture de test : ',
 
-      SUCCESS_TITLE: '✅ Configuration Terminée !',
-      SUCCESS_MESSAGE: 'Votre système de facturation est prêt !\n\nVous pouvez maintenant :\n• Ajouter des factures dans "Invoices"\n• Générer des PDF depuis le menu "📄 Invoices"\n• Personnaliser votre template dans Google Docs',
+      SUCCESS_TITLE: '✅ Configuration terminée !',
+      SUCCESS_MESSAGE: 'Votre système de facturation est prêt !\n\nVous pouvez maintenant :\n• Ajouter des factures dans "Invoices"\n• Générer des PDF depuis le menu "📄 Factures"\n• Personnaliser votre template dans Google Docs',
 
-      FINAL_TITLE: '🎊 C\'est Terminé !',
+      FINAL_TITLE: '🎊 C\'est terminé !',
       FINAL_MESSAGE: 'Configuration réussie !\n\nÉtapes suivantes :\n1. Vérifiez la feuille "Settings" (auto-configurée)\n2. Consultez le document template\n3. Créez votre première vraie facture\n\nBesoin d\'aide ? Consultez le guide ou contactez le support.',
 
       COMPANY_NAME_PROMPT: 'Nom de votre entreprise :',

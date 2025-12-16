@@ -121,7 +121,7 @@ const COUNTRY_CONFIG = {
 
       // Table headers
       description: 'DESIGNATION',
-      quantity: 'QTE',
+      quantity: 'QUANTITE',
       unit: 'Unite',
       unitPrice: 'PRIX U. HT',
       unitPriceShort: 'P.U. HT',
@@ -276,7 +276,7 @@ const COUNTRY_CONFIG = {
 
       // Table headers
       description: 'DESIGNATION',
-      quantity: 'QTE',
+      quantity: 'QUANTITE',
       unit: 'Unite',
       unitPrice: 'PRIX UNITAIRE',
       unitPriceShort: 'P.U.',
@@ -437,7 +437,7 @@ const COUNTRY_CONFIG = {
 
       // Table headers
       description: 'DESCRIPTION',
-      quantity: 'QTY',
+      quantity: 'QUANTITY',
       unit: 'Unit',
       unitPrice: 'UNIT PRICE',
       unitPriceShort: 'RATE',

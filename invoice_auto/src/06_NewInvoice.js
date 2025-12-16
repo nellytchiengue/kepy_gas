@@ -95,7 +95,7 @@ function createNewClient(clientData) {
 
     const existingClient = getClientByName(clientData.name);
     if (existingClient) {
-      return { success: false, message: 'Client deja existant' };
+      return { success: false, message: 'Client déjà existant' };
     }
 
     const clientId = generateNextClientId();
@@ -118,7 +118,7 @@ function createNewClient(clientData) {
     ];
     clientsSheet.appendRow(newRow);
 
-    logSuccess('createNewClient', 'Client ' + clientId + ' cree');
+    logSuccess('createNewClient', 'Client ' + clientId + ' créé');
 
     return {
       success: true,
@@ -183,12 +183,12 @@ function getNewInvoiceFormHtml() {
     namePH: 'Nom complet ou entreprise',
     emailPH: 'email@exemple.com',
     phonePH: '+33 6 12 34 56 78',
-    addressPH: '123 Rue Example, Ville',
+    addressPH: '123 Rue Exemple, Ville',
     serviceSection: 'Produit / Service',
     selectServicePH: 'Choisir un service...',
     customServiceToggle: 'Description personnalisée',
-    description: 'Description',
-    descPH: 'Ex: Prestation de services',
+    description: 'Désignation',
+    descPH: 'Ex : Prestation de services',
     quantity: 'Quantité',
     unitPrice: 'Prix unitaire',
     tvaRate: 'Taux TVA (%)',
@@ -196,7 +196,7 @@ function getNewInvoiceFormHtml() {
     total: 'Total',
     btnCreate: 'Créer la facture',
     btnCancel: 'Annuler',
-    processing: 'Création...',
+    processing: 'Création en cours...',
     success: 'Facture créée !',
     successWithClient: 'Client et facture créés !',
     error: 'Erreur',
@@ -206,10 +206,10 @@ function getNewInvoiceFormHtml() {
     noServices: 'Aucun service disponible',
     addServiceHint: 'Ajoutez des services dans l\'onglet Services',
     // Legal ID labels
-    legalIdSection: 'Identifiants legaux (optionnel)',
+    legalIdSection: 'Identifiants légaux (optionnel)',
     siretLabel: 'SIRET',
     siretPH: '12345678901234',
-    vatNumberLabel: 'N TVA Intracommunautaire',
+    vatNumberLabel: 'N° TVA Intracommunautaire',
     vatNumberPH: 'FR12345678901',
     niuLabel: 'NIU',
     niuPH: 'M012345678901A',
@@ -333,7 +333,9 @@ function getNewInvoiceFormHtml() {
   html += '.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}';
   html += '.input-group{position:relative}';
   html += '.input-prefix{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--gray-400);font-size:14px;font-weight:500}';
-  html += '.input-group input{padding-left:30px}';
+  html += '.input-group input{padding-left:50px;padding-right:14px}';
+  html += '.input-group input[type=number]{-moz-appearance:textfield}';
+  html += '.input-group input[type=number]::-webkit-outer-spin-button,.input-group input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}';
   html += '.total-display{background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:var(--radius);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;margin-top:6px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1)}';
   html += '.total-label{font-size:13px;font-weight:500;color:rgba(255,255,255,.85)}';
   html += '.total-amount{font-size:22px;font-weight:700;color:#fff}';
@@ -571,7 +573,7 @@ function createNewInvoice(clientInfo, description, quantity, unitPrice, tva) {
     ];
     invoicesSheet.appendRow(newRow);
 
-    logSuccess('createNewInvoice', 'Facture ' + invoiceId + ' créée pour client ' + clientInfo.id + ' at ' + createdAt);
+    logSuccess('createNewInvoice', 'Facture ' + invoiceId + ' créée pour client ' + clientInfo.id + ' à ' + createdAt);
     return { success: true, invoiceId: invoiceId, message: 'OK' };
   } catch (error) {
     logError('createNewInvoice', 'Erreur', error);

@@ -11,29 +11,67 @@
 // ============================================================================
 
 /**
- * Gets or creates a subfolder for a client in the root folder
- * Récupère ou crée un sous-dossier pour un client dans le dossier racine
- * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder
- * @param {string} clientName - The client name
- * @returns {GoogleAppsScript.Drive.Folder} The client folder
+ * Gets or creates the DOCUMENTS parent folder in the root folder
+ * Récupère ou crée le dossier parent DOCUMENTS dans le dossier racine
+ * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder from Settings
+ * @returns {GoogleAppsScript.Drive.Folder} The DOCUMENTS folder
  */
-function getOrCreateClientFolder(rootFolder, clientName) {
+function getOrCreateDocumentsFolder(rootFolder) {
   try {
-    // Clean client name to make it folder-safe
-    const safeFolderName = cleanString(clientName).replace(/[^a-z0-9\s\-_]/gi, '_');
+    // Get folder name from settings, default to "DOCUMENTS"
+    const folderName = getParam(INVOICE_CONFIG.PARAM_KEYS.DOCUMENTS_FOLDER_NAME) || 'DOCUMENTS';
 
-    // Search for existing folder with this name
-    const existingFolders = rootFolder.getFoldersByName(safeFolderName);
+    // Search for existing DOCUMENTS folder
+    const existingFolders = rootFolder.getFoldersByName(folderName);
 
     if (existingFolders.hasNext()) {
       const folder = existingFolders.next();
-      logSuccess('getOrCreateClientFolder', `Using existing folder: ${safeFolderName}`);
+      logSuccess('getOrCreateDocumentsFolder', `Using existing folder: ${folderName}`);
       return folder;
     }
 
-    // Create new folder if doesn't exist
-    const newFolder = rootFolder.createFolder(safeFolderName);
-    logSuccess('getOrCreateClientFolder', `Created new folder: ${safeFolderName}`);
+    // Create new DOCUMENTS folder if doesn't exist
+    const newFolder = rootFolder.createFolder(folderName);
+    logSuccess('getOrCreateDocumentsFolder', `Created new folder: ${folderName}`);
+    return newFolder;
+
+  } catch (error) {
+    logError('getOrCreateDocumentsFolder', 'Error creating DOCUMENTS folder', error);
+    // Fallback: return root folder if creation fails
+    return rootFolder;
+  }
+}
+
+/**
+ * Gets or creates a subfolder for a client inside the DOCUMENTS folder
+ * Récupère ou crée un sous-dossier pour un client dans le dossier DOCUMENTS
+ *
+ * Structure: ROOT_FOLDER → DOCUMENTS → [Client Name] → invoices
+ *
+ * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder from Settings
+ * @param {string} clientName - The client name
+ * @returns {GoogleAppsScript.Drive.Folder} The client folder inside DOCUMENTS
+ */
+function getOrCreateClientFolder(rootFolder, clientName) {
+  try {
+    // First, get or create the DOCUMENTS parent folder
+    const documentsFolder = getOrCreateDocumentsFolder(rootFolder);
+
+    // Clean client name to make it folder-safe
+    const safeFolderName = cleanString(clientName).replace(/[^a-z0-9\s\-_]/gi, '_');
+
+    // Search for existing client folder inside DOCUMENTS
+    const existingFolders = documentsFolder.getFoldersByName(safeFolderName);
+
+    if (existingFolders.hasNext()) {
+      const folder = existingFolders.next();
+      logSuccess('getOrCreateClientFolder', `Using existing folder: DOCUMENTS/${safeFolderName}`);
+      return folder;
+    }
+
+    // Create new client folder inside DOCUMENTS if doesn't exist
+    const newFolder = documentsFolder.createFolder(safeFolderName);
+    logSuccess('getOrCreateClientFolder', `Created new folder: DOCUMENTS/${safeFolderName}`);
     return newFolder;
 
   } catch (error) {
@@ -164,8 +202,9 @@ function generateInvoiceById(invoiceId) {
  */
 function replaceMarkers(body, invoiceData, companyParams) {
   const country = companyParams.country || 'FR';
+  const lang = getConfiguredLocale(); // Display language (FR or EN)
 
-  // Get labels based on country configuration
+  // Get labels based on language configuration
   const labels = getInvoiceLabels();
 
   // =========================================================================
@@ -286,18 +325,20 @@ function replaceMarkers(body, invoiceData, companyParams) {
 
   // =========================================================================
   // LEGAL FOOTER / MENTIONS LEGALES
+  // Uses custom footer from Settings if available, otherwise auto-generates
   // =========================================================================
-  const legalFooter = generateLegalFooter(country, companyParams, invoiceData);
+  const legalFooter = getLegalFooterForInvoice(companyParams, invoiceData, lang);
   body.replaceText(INVOICE_CONFIG.MARKERS.LEGAL_FOOTER, legalFooter);
 
-  // Specific legal notices
+  // Specific legal notices (with language support)
+  // These are only used if the template has individual markers for them
   if (country === 'FR' && companyParams.isAutoEntrepreneur) {
-    body.replaceText(INVOICE_CONFIG.MARKERS.VAT_EXEMPTION_NOTICE, 'TVA non applicable, art. 293 B du CGI');
+    body.replaceText(INVOICE_CONFIG.MARKERS.VAT_EXEMPTION_NOTICE, getVatExemptionNoticeFR(lang));
   } else {
     body.replaceText(INVOICE_CONFIG.MARKERS.VAT_EXEMPTION_NOTICE, '');
   }
 
-  body.replaceText(INVOICE_CONFIG.MARKERS.LATE_PAYMENT_NOTICE, country === 'FR' ? getLatePaymentNoticeFR() : '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.LATE_PAYMENT_NOTICE, country === 'FR' ? getLatePaymentNoticeFR(lang) : '');
   body.replaceText(INVOICE_CONFIG.MARKERS.SALES_TAX_NOTICE, country === 'US' ? getSalesTaxNoticeUS(companyParams.salesTaxRate) : '');
 
   // =========================================================================

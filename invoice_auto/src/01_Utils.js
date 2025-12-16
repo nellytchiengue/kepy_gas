@@ -73,7 +73,7 @@ function getCompanyParams() {
     capital: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_CAPITAL) || '',
     legalForm: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_LEGAL_FORM) || '',
     apeCode: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_APE_CODE) || '',
-    isAutoEntrepreneur: getParam(INVOICE_CONFIG.PARAM_KEYS.IS_AUTO_ENTREPRENEUR) === 'true',
+    isAutoEntrepreneur: String(getParam(INVOICE_CONFIG.PARAM_KEYS.IS_AUTO_ENTREPRENEUR)).toLowerCase() === 'true',
 
     // Cameroon (CM) Legal IDs
     niu: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_NIU) || '',

@@ -332,10 +332,12 @@ function validateInvoiceData(invoiceData) {
     errors.push('Invalid total amount');
   }
 
-  // Validation Amount Consistency
-  const expectedTotal = invoiceData.quantity * invoiceData.unitPrice;
+  // Validation Amount Consistency (including TVA)
+  const subtotal = invoiceData.quantity * invoiceData.unitPrice;
+  const tvaAmount = invoiceData.tva || 0;
+  const expectedTotal = subtotal + tvaAmount;
   if (Math.abs(invoiceData.totalAmount - expectedTotal) > 0.01) {
-    errors.push(`Inconsistency: Total amount (${invoiceData.totalAmount}) ≠ Quantity × Unit Price (${expectedTotal})`);
+    errors.push(`Inconsistency: Total amount (${invoiceData.totalAmount}) ≠ (Quantity × Unit Price) + TVA (${subtotal} + ${tvaAmount} = ${expectedTotal})`);
   }
 
   return {

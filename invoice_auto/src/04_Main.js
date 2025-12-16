@@ -21,11 +21,14 @@ function onOpen() {
   // Label pour l'ajout de facture
   const newInvoiceLabel = lang === 'FR' ? '➕ Nouvelle facture' : '➕ New Invoice';
 
-  // Label pour la generation de factures
-  const generateLabel = lang === 'FR' ? '📄 Generer des factures' : '📄 Generate Invoices';
+  // Label pour la génération de factures
+  const generateLabel = lang === 'FR' ? '📄 Générer des factures' : '📄 Generate Invoices';
 
   // Label pour changer de langue (affiche l'autre langue disponible)
-  const changeLangLabel = lang === 'FR' ? '🌐 Switch to English' : '🌐 Passer en Francais';
+  const changeLangLabel = lang === 'FR' ? '🌐 Switch to English' : '🌐 Passer en Français';
+
+  // Label pour régénérer le footer légal
+  const regenerateFooterLabel = lang === 'FR' ? '📝 Régénérer footer légal' : '📝 Regenerate Legal Footer';
 
   ui.createMenu(msg.MENU_TITLE)
     .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice')
@@ -38,6 +41,7 @@ function onOpen() {
     .addSeparator()
     .addSeparator()
     .addItem(changeLangLabel, 'menuChangeLanguage')
+    .addItem(regenerateFooterLabel, 'menuRegenerateLegalFooter')
     .addItem(msg.MENU_SETUP_INSTALLATION, 'launchSetupWizard')
     .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
     .addItem(msg.MENU_ABOUT, 'menuAbout')
@@ -321,16 +325,27 @@ function menuChangeLanguage() {
   SpreadsheetApp.flush();
 
   if (success) {
-    const message = newLang === 'FR'
-      ? 'Langue changee en Francais.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
-      : 'Language changed to English.\n\nPlease RELOAD the page (F5) to apply changes.';
+    // Regenerate legal footer in the new language
+    try {
+      generateAndSaveLegalFooterToSettings(null, newLang);
+      logSuccess('menuChangeLanguage', `Legal footer regenerated in ${newLang}`);
+    } catch (error) {
+      logError('menuChangeLanguage', 'Error regenerating legal footer', error);
+      // Continue anyway - footer can be regenerated manually
+    }
 
-    const title = newLang === 'FR' ? 'Langue mise a jour' : 'Language Updated';
+    SpreadsheetApp.flush();
+
+    const message = newLang === 'FR'
+      ? 'Langue changée en Français.\nLe footer légal a été régénéré.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
+      : 'Language changed to English.\nLegal footer has been regenerated.\n\nPlease RELOAD the page (F5) to apply changes.';
+
+    const title = newLang === 'FR' ? 'Langue mise à jour' : 'Language Updated';
 
     ui.alert(title, message, ui.ButtonSet.OK);
   } else {
     const errorMsg = currentLang === 'FR'
-      ? 'Erreur lors du changement de langue. Verifiez la feuille Settings.'
+      ? 'Erreur lors du changement de langue. Vérifiez la feuille Settings.'
       : 'Error changing language. Check the Settings sheet.';
 
     ui.alert('Error', errorMsg, ui.ButtonSet.OK);
@@ -507,7 +522,7 @@ function testAllPermissions() {
       results.details.push({
         test: 'Permission Gmail',
         success: true,
-        message: 'OK - Auto-send activé'
+        message: 'OK - Envoi auto activé'
       });
     } else {
       results.details.push({
@@ -541,7 +556,7 @@ function scheduledInvoiceGeneration() {
 
     const result = generateAllPendingInvoices();
 
-    logSuccess('scheduledInvoiceGeneration', `Génération terminée: ${result.message}`);
+    logSuccess('scheduledInvoiceGeneration', `Génération terminée : ${result.message}`);
 
     // Force UI refresh
     SpreadsheetApp.flush();

@@ -171,7 +171,16 @@ const INVOICE_CONFIG = {
 
     // Payment Terms / Conditions de Paiement
     DEFAULT_PAYMENT_TERMS: 'DEFAULT_PAYMENT_TERMS', // Default payment terms text
-    DEFAULT_PAYMENT_DAYS: 'DEFAULT_PAYMENT_DAYS'    // Default payment days (e.g., 30)
+    DEFAULT_PAYMENT_DAYS: 'DEFAULT_PAYMENT_DAYS',   // Default payment days (e.g., 30)
+
+    // Customizable Legal Footer / Footer Legal Personnalisable
+    // These fields can be auto-generated at setup OR manually edited after
+    LEGAL_FOOTER_CUSTOM: 'LEGAL_FOOTER_CUSTOM',     // Full legal footer text (editable)
+    BANK_DETAILS_CUSTOM: 'BANK_DETAILS_CUSTOM',     // Bank details text (editable)
+    USE_CUSTOM_FOOTER: 'USE_CUSTOM_FOOTER',         // true = use custom, false = auto-generate
+
+    // Folder Organization / Organisation des Dossiers
+    DOCUMENTS_FOLDER_NAME: 'DOCUMENTS_FOLDER_NAME'  // Parent folder name for all client docs (default: DOCUMENTS)
   },
 
   // ---------------------------------------------------------------------------
@@ -585,7 +594,7 @@ const INVOICE_LABELS = {
     LABEL_DUE_DATE: 'Due Date',
     LABEL_BILLED_TO: 'Billed To / Client',
     LABEL_DESCRIPTION: 'DESCRIPTION',
-    LABEL_QTY: 'QTY',
+    LABEL_QTY: 'QUANTITY',
     LABEL_UNIT_PRICE: 'UNIT PRICE',
     LABEL_TVA: 'VAT',
     LABEL_TOTAL: 'LINE TOTAL',
@@ -598,7 +607,7 @@ const INVOICE_LABELS = {
     LABEL_DATE: 'Date',
     LABEL_DUE_DATE: "Date d'échéance",
     LABEL_BILLED_TO: 'Facturé à / Client',
-    LABEL_DESCRIPTION: 'DESCRIPTION',
+    LABEL_DESCRIPTION: 'DÉSIGNATION',
     LABEL_QTY: 'QUANTITÉ',
     LABEL_UNIT_PRICE: 'PRIX UNITAIRE',
     LABEL_TVA: 'TVA',
@@ -651,11 +660,11 @@ ${data.companyEmail}`
 
 Veuillez trouver ci-joint votre facture n°${data.invoiceId} d'un montant de ${data.totalAmountFormatted}.
 
-Détails de la facture:
-- Date: ${data.dateFormatted}
-- Désignation: ${data.description}
-- Quantité: ${data.quantity}
-- Prix unitaire: ${data.unitPriceFormatted}
+Détails de la facture :
+- Date : ${data.dateFormatted}
+- Désignation : ${data.description}
+- Quantité : ${data.quantity}
+- Prix unitaire : ${data.unitPriceFormatted}
 
 Nous restons à votre disposition pour toute question.
 
