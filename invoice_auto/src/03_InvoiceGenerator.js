@@ -1,7 +1,8 @@
 /**
  * @file 03_InvoiceGenerator.js
  * @description Automatic Google Doc and PDF invoice generation from template
- * @version 1.2 (Google Doc + PDF with client folders)
+ *              Multi-country support (FR/CM/US) with dynamic legal footers
+ * @version 2.0 (Multi-Country Edition)
  * @date 2025-12-14
  */
 
@@ -156,52 +157,214 @@ function generateInvoiceById(invoiceId) {
 
 /**
  * Replaces all markers in the document with actual data
+ * Version 2.0: Multi-country support with legal IDs and dynamic footers
  * @param {GoogleAppsScript.Document.Body} body - The document body
  * @param {Object} invoiceData - The invoice data
  * @param {Object} companyParams - The company parameters
  */
 function replaceMarkers(body, invoiceData, companyParams) {
-  // Get labels in configured language
+  const country = companyParams.country || 'FR';
+
+  // Get labels based on country configuration
   const labels = getInvoiceLabels();
 
-  // Company Information
+  // =========================================================================
+  // COMPANY INFORMATION / INFORMATIONS ENTREPRISE
+  // =========================================================================
   body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_NAME, companyParams.name || 'N/A');
   body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_ADDRESS, companyParams.address || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_PHONE, companyParams.phone || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_EMAIL, companyParams.email || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_PHONE, companyParams.phone || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_EMAIL, companyParams.email || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_WEBSITE, companyParams.website || '');
 
-  // Invoice Information
+  // Company Legal IDs Block (formatted based on country)
+  const companyLegalIds = getCompanyLegalIdsFormatted(companyParams);
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_LEGAL_IDS, companyLegalIds);
+
+  // Individual company legal IDs (France)
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_SIRET, companyParams.siret || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_SIREN, companyParams.siren || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_VAT_FR, companyParams.vatFR || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_RCS, companyParams.rcs || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_CAPITAL, companyParams.capital || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_LEGAL_FORM, companyParams.legalForm || '');
+
+  // Individual company legal IDs (Cameroon)
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_NIU, companyParams.niu || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_RCCM, companyParams.rccm || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_TAX_CENTER, companyParams.taxCenter || '');
+
+  // Individual company legal IDs (USA)
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_EIN, companyParams.ein || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.COMPANY_STATE_ID, companyParams.stateId || '');
+
+  // =========================================================================
+  // INVOICE INFORMATION / INFORMATIONS FACTURE
+  // =========================================================================
   body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_ID, invoiceData.invoiceId);
-  body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_DATE, formatDate(invoiceData.date));
+  body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_DATE, formatDateForCountry(invoiceData.date));
 
-  // Client Information
+  // Due date (if available)
+  const dueDate = invoiceData.dueDate || calculateDueDate(invoiceData.date, companyParams.defaultPaymentDays);
+  body.replaceText(INVOICE_CONFIG.MARKERS.INVOICE_DUE_DATE, formatDateForCountry(dueDate));
+
+  // Optional fields
+  body.replaceText(INVOICE_CONFIG.MARKERS.DELIVERY_DATE, invoiceData.deliveryDate ? formatDateForCountry(invoiceData.deliveryDate) : '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.PO_NUMBER, invoiceData.poNumber || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.PAYMENT_TERMS, companyParams.defaultPaymentTerms || '');
+
+  // =========================================================================
+  // CLIENT INFORMATION / INFORMATIONS CLIENT
+  // =========================================================================
   body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_NAME, invoiceData.clientName || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_EMAIL, invoiceData.clientEmail || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_PHONE, invoiceData.clientPhone || 'N/A');
-  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_ADDRESS, invoiceData.clientAddress || 'N/A');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_EMAIL, invoiceData.clientEmail || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_PHONE, invoiceData.clientPhone || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_ADDRESS, invoiceData.clientAddress || '');
 
-  // Transaction Details
+  // Client Legal IDs Block (if available in invoiceData)
+  const clientLegalIds = getClientLegalIdsFormatted(invoiceData, country);
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_LEGAL_IDS, clientLegalIds);
+
+  // Individual client legal IDs
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_SIRET, invoiceData.clientSiret || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_VAT_NUMBER, invoiceData.clientVatNumber || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_NIU, invoiceData.clientNiu || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.CLIENT_TAX_ID, invoiceData.clientTaxId || '');
+
+  // =========================================================================
+  // LINE ITEMS / LIGNES DE FACTURE
+  // =========================================================================
   body.replaceText(INVOICE_CONFIG.MARKERS.DESCRIPTION, invoiceData.description);
   body.replaceText(INVOICE_CONFIG.MARKERS.QUANTITY, String(invoiceData.quantity));
-  body.replaceText(INVOICE_CONFIG.MARKERS.UNIT_PRICE, formatAmount(invoiceData.unitPrice));
-  body.replaceText(INVOICE_CONFIG.MARKERS.TVA, formatAmount(invoiceData.tva || 0));
-  body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_AMOUNT, formatAmount(invoiceData.totalAmount));
+  body.replaceText(INVOICE_CONFIG.MARKERS.UNIT_PRICE, formatAmountForCountry(invoiceData.unitPrice));
 
-  // Amount in Words
-  const amountInWords = convertAmountToWords(invoiceData.totalAmount);
+  // VAT/Tax details
+  const vatRate = invoiceData.vatRate || companyParams.defaultVatRate || 0;
+  const tvaAmount = invoiceData.tva || 0;
+  body.replaceText(INVOICE_CONFIG.MARKERS.LINE_VAT_RATE, vatRate + '%');
+  body.replaceText(INVOICE_CONFIG.MARKERS.LINE_VAT_AMOUNT, formatAmountForCountry(tvaAmount));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TVA, formatAmountForCountry(tvaAmount));
+
+  // =========================================================================
+  // TOTALS / TOTAUX
+  // =========================================================================
+  const subtotalHT = invoiceData.quantity * invoiceData.unitPrice;
+  const totalTTC = invoiceData.totalAmount;
+
+  body.replaceText(INVOICE_CONFIG.MARKERS.SUBTOTAL_HT, formatAmountForCountry(subtotalHT));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_TVA, formatAmountForCountry(tvaAmount));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_TTC, formatAmountForCountry(totalTTC));
+  body.replaceText(INVOICE_CONFIG.MARKERS.TOTAL_AMOUNT, formatAmountForCountry(totalTTC));
+
+  // TVA Summary (for multi-rate, simplified for now)
+  const tvaSummary = `TVA ${vatRate}%: ${formatAmountForCountry(tvaAmount)}`;
+  body.replaceText(INVOICE_CONFIG.MARKERS.TVA_SUMMARY, tvaSummary);
+
+  // =========================================================================
+  // AMOUNT IN WORDS / MONTANT EN LETTRES
+  // =========================================================================
+  const amountInWords = convertAmountToWordsForCountry(totalTTC, country);
   body.replaceText(INVOICE_CONFIG.MARKERS.AMOUNT_IN_WORDS, amountInWords);
 
-  // Invoice Labels (translated according to language)
+  // Amount in words block (for Cameroon - MANDATORY)
+  if (country === 'CM') {
+    const amountBlock = `Arretee la presente facture a la somme de:\n${amountInWords}`;
+    body.replaceText(INVOICE_CONFIG.MARKERS.AMOUNT_IN_WORDS_BLOCK, amountBlock);
+  } else {
+    body.replaceText(INVOICE_CONFIG.MARKERS.AMOUNT_IN_WORDS_BLOCK, '');
+  }
+
+  // =========================================================================
+  // BANK DETAILS / COORDONNEES BANCAIRES
+  // =========================================================================
+  const bankDetails = getBankDetailsFormatted(companyParams);
+  body.replaceText(INVOICE_CONFIG.MARKERS.BANK_DETAILS, bankDetails);
+  body.replaceText(INVOICE_CONFIG.MARKERS.BANK_NAME, companyParams.bankName || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.BANK_IBAN, companyParams.bankIban || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.BANK_BIC, companyParams.bankBic || '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.BANK_ACCOUNT_NAME, companyParams.bankAccountName || '');
+
+  // =========================================================================
+  // LEGAL FOOTER / MENTIONS LEGALES
+  // =========================================================================
+  const legalFooter = generateLegalFooter(country, companyParams, invoiceData);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LEGAL_FOOTER, legalFooter);
+
+  // Specific legal notices
+  if (country === 'FR' && companyParams.isAutoEntrepreneur) {
+    body.replaceText(INVOICE_CONFIG.MARKERS.VAT_EXEMPTION_NOTICE, 'TVA non applicable, art. 293 B du CGI');
+  } else {
+    body.replaceText(INVOICE_CONFIG.MARKERS.VAT_EXEMPTION_NOTICE, '');
+  }
+
+  body.replaceText(INVOICE_CONFIG.MARKERS.LATE_PAYMENT_NOTICE, country === 'FR' ? getLatePaymentNoticeFR() : '');
+  body.replaceText(INVOICE_CONFIG.MARKERS.SALES_TAX_NOTICE, country === 'US' ? getSalesTaxNoticeUS(companyParams.salesTaxRate) : '');
+
+  // =========================================================================
+  // LABELS (TRANSLATED) / ETIQUETTES (TRADUITES)
+  // =========================================================================
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_INVOICE, labels.LABEL_INVOICE);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_INVOICE_NUMBER, labels.LABEL_INVOICE_NUMBER);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_DATE, labels.LABEL_DATE);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_DUE_DATE, labels.LABEL_DUE_DATE || labels.LABEL_DATE);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_BILLED_TO, labels.LABEL_BILLED_TO);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_DESCRIPTION, labels.LABEL_DESCRIPTION);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_QTY, labels.LABEL_QTY);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_UNIT_PRICE, labels.LABEL_UNIT_PRICE);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TVA, labels.LABEL_TVA);
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TOTAL, labels.LABEL_TOTAL);
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_SUBTOTAL, labels.LABEL_SUBTOTAL || 'Sous-total HT');
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TOTAL_VAT, labels.LABEL_TOTAL_VAT || 'Total TVA');
+  body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_TOTAL_TTC, labels.LABEL_TOTAL_TTC || 'Total TTC');
   body.replaceText(INVOICE_CONFIG.MARKERS.LABEL_FOOTER, labels.LABEL_FOOTER);
+
+  // =========================================================================
+  // CLEANUP UNUSED PLACEHOLDERS / NETTOYAGE DES PLACEHOLDERS NON UTILISES
+  // =========================================================================
+  cleanUnusedPlaceholders(body, country);
+
+  logSuccess('replaceMarkers', `Markers replaced for invoice ${invoiceData.invoiceId} (country: ${country})`);
+}
+
+// ============================================================================
+// HELPER FUNCTIONS FOR MARKER REPLACEMENT
+// ============================================================================
+
+/**
+ * Gets client legal IDs formatted based on country
+ * @param {Object} invoiceData - Invoice data with client info
+ * @param {string} country - Country code
+ * @returns {string} Formatted client legal IDs
+ */
+function getClientLegalIdsFormatted(invoiceData, country) {
+  const ids = [];
+
+  switch (country) {
+    case 'FR':
+      if (invoiceData.clientSiret) ids.push(`SIRET: ${invoiceData.clientSiret}`);
+      if (invoiceData.clientVatNumber) ids.push(`TVA: ${invoiceData.clientVatNumber}`);
+      break;
+    case 'CM':
+      if (invoiceData.clientNiu) ids.push(`NIU: ${invoiceData.clientNiu}`);
+      break;
+    case 'US':
+      if (invoiceData.clientTaxId) ids.push(`Tax ID: ${invoiceData.clientTaxId}`);
+      break;
+  }
+
+  return ids.join(' | ');
+}
+
+/**
+ * Calculates due date from invoice date + payment days
+ * @param {Date} invoiceDate - Invoice date
+ * @param {number} paymentDays - Number of days for payment
+ * @returns {Date} Due date
+ */
+function calculateDueDate(invoiceDate, paymentDays) {
+  const date = new Date(invoiceDate);
+  date.setDate(date.getDate() + (paymentDays || 30));
+  return date;
 }
 
 // ============================================================================

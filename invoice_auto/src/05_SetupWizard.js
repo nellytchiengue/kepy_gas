@@ -1,10 +1,11 @@
 /**
  * @file 05_SetupWizard.js
  * @description Setup Wizard for easy first-time installation
+ *              Multi-country support (FR/CM/US) with legal ID collection
  *              Assistant d'installation pour une première configuration facile
- * @version 1.1 (Gumroad Edition)
- * @date 2025-12-11
- * @author InvoiceFlash - One-Click Invoice Generator
+ * @version 2.0 (Multi-Country Edition)
+ * @date 2025-12-14
+ * @author InvoiceFlash - Multi-Country Invoice Generator
  */
 
 // ============================================================================
@@ -171,7 +172,7 @@ function getCurrentSpreadsheetFolder() {
 // ============================================================================
 
 /**
- * Collects company information from user
+ * Collects company information from user (multi-country edition)
  * Collecte les informations de l'entreprise auprès de l'utilisateur
  * @param {string} lang - Language code
  * @returns {Object|null} Company info object or null if cancelled
@@ -179,6 +180,31 @@ function getCurrentSpreadsheetFolder() {
 function collectCompanyInfo(lang) {
   const ui = SpreadsheetApp.getUi();
   const messages = getSetupMessages(lang);
+
+  // ===========================================================================
+  // COUNTRY SELECTION / SELECTION DU PAYS
+  // ===========================================================================
+  const countryPrompt = lang === 'FR'
+    ? 'Dans quel pays votre entreprise est-elle enregistree?\n\nEntrez:\n• "FR" pour France\n• "CM" pour Cameroun\n• "US" pour Etats-Unis'
+    : 'In which country is your company registered?\n\nEnter:\n• "FR" for France\n• "CM" for Cameroon\n• "US" for United States';
+
+  const countryResponse = ui.prompt(
+    lang === 'FR' ? 'Pays d\'enregistrement' : 'Country of Registration',
+    countryPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (countryResponse.getSelectedButton() !== ui.Button.OK) return null;
+  let country = countryResponse.getResponseText().trim().toUpperCase();
+
+  // Validate country code
+  if (!['FR', 'CM', 'US'].includes(country)) {
+    country = 'FR'; // Default to France
+  }
+
+  // ===========================================================================
+  // BASIC COMPANY INFO / INFOS ENTREPRISE DE BASE
+  // ===========================================================================
 
   // Company name / Nom de l'entreprise
   const nameResponse = ui.prompt(
@@ -216,13 +242,25 @@ function collectCompanyInfo(lang) {
   if (emailResponse.getSelectedButton() !== ui.Button.OK) return null;
   const companyEmail = emailResponse.getResponseText().trim();
 
-  // Preferred language / Langue préférée
+  // ===========================================================================
+  // COUNTRY-SPECIFIC LEGAL IDS / IDENTIFIANTS LEGAUX PAR PAYS
+  // ===========================================================================
+  const legalIds = collectCountrySpecificLegalIds(ui, lang, country);
+
+  // ===========================================================================
+  // BANK DETAILS (OPTIONAL) / COORDONNEES BANCAIRES (OPTIONNEL)
+  // ===========================================================================
+  const bankDetails = collectBankDetails(ui, lang);
+
+  // ===========================================================================
+  // PREFERRED LANGUAGE / LANGUE PREFEREE
+  // ===========================================================================
   const localePrompt = lang === 'FR'
-    ? 'Choisissez la langue par défaut:\nEntrez "FR" pour Français ou "EN" pour Anglais:'
+    ? 'Choisissez la langue par defaut:\nEntrez "FR" pour Francais ou "EN" pour Anglais:'
     : 'Choose default language:\nEnter "FR" for French or "EN" for English:';
 
   const localeResponse = ui.prompt(
-    lang === 'FR' ? 'Langue préférée' : 'Preferred Language',
+    lang === 'FR' ? 'Langue preferee' : 'Preferred Language',
     localePrompt,
     ui.ButtonSet.OK_CANCEL
   );
@@ -236,12 +274,361 @@ function collectCompanyInfo(lang) {
   }
 
   return {
+    country: country,
     name: companyName,
     address: companyAddress,
     phone: companyPhone,
     email: companyEmail,
-    locale: preferredLocale
+    locale: preferredLocale,
+    ...legalIds,
+    ...bankDetails
   };
+}
+
+// ============================================================================
+// COUNTRY-SPECIFIC LEGAL ID COLLECTION / COLLECTE IDS LEGAUX PAR PAYS
+// ============================================================================
+
+/**
+ * Collects country-specific legal identifiers
+ * Collecte les identifiants legaux specifiques au pays
+ * @param {Object} ui - SpreadsheetApp UI object
+ * @param {string} lang - Language code
+ * @param {string} country - Country code (FR, CM, US)
+ * @returns {Object} Legal IDs object
+ */
+function collectCountrySpecificLegalIds(ui, lang, country) {
+  const isFrench = lang === 'FR';
+
+  switch (country) {
+    case 'FR':
+      return collectFrenchLegalIds(ui, isFrench);
+    case 'CM':
+      return collectCameroonLegalIds(ui, isFrench);
+    case 'US':
+      return collectUSLegalIds(ui, isFrench);
+    default:
+      return collectFrenchLegalIds(ui, isFrench);
+  }
+}
+
+/**
+ * Collects French legal IDs (SIRET, SIREN, TVA, RCS)
+ * @param {Object} ui - SpreadsheetApp UI object
+ * @param {boolean} isFrench - True if French language
+ * @returns {Object} French legal IDs
+ */
+function collectFrenchLegalIds(ui, isFrench) {
+  const result = {};
+
+  // SIRET (MANDATORY for France)
+  const siretPrompt = isFrench
+    ? 'Numero SIRET (14 chiffres - OBLIGATOIRE):\nExemple: 12345678901234'
+    : 'SIRET Number (14 digits - REQUIRED):\nExample: 12345678901234';
+
+  const siretResponse = ui.prompt(
+    'SIRET',
+    siretPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (siretResponse.getSelectedButton() === ui.Button.OK) {
+    result.siret = siretResponse.getResponseText().trim().replace(/\s/g, '');
+  }
+
+  // Auto-entrepreneur status
+  const autoEntrepreneurPrompt = isFrench
+    ? 'Etes-vous auto-entrepreneur/micro-entrepreneur?\n\nEntrez "OUI" ou "NON":\n(Si OUI, la mention TVA non applicable sera ajoutee)'
+    : 'Are you an auto-entrepreneur/micro-entrepreneur?\n\nEnter "YES" or "NO":\n(If YES, VAT exemption notice will be added)';
+
+  const autoResponse = ui.prompt(
+    isFrench ? 'Statut Auto-entrepreneur' : 'Auto-entrepreneur Status',
+    autoEntrepreneurPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (autoResponse.getSelectedButton() === ui.Button.OK) {
+    const answer = autoResponse.getResponseText().trim().toUpperCase();
+    result.isAutoEntrepreneur = ['OUI', 'YES', 'O', 'Y', '1', 'TRUE'].includes(answer);
+  } else {
+    result.isAutoEntrepreneur = false;
+  }
+
+  // If NOT auto-entrepreneur, collect additional IDs
+  if (!result.isAutoEntrepreneur) {
+    // TVA Intracommunautaire
+    const vatPrompt = isFrench
+      ? 'Numero TVA Intracommunautaire (optionnel):\nExemple: FR12345678901'
+      : 'EU VAT Number (optional):\nExample: FR12345678901';
+
+    const vatResponse = ui.prompt(
+      isFrench ? 'TVA Intracommunautaire' : 'EU VAT Number',
+      vatPrompt,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (vatResponse.getSelectedButton() === ui.Button.OK) {
+      result.vatFR = vatResponse.getResponseText().trim();
+    }
+
+    // RCS
+    const rcsPrompt = isFrench
+      ? 'RCS (Registre du Commerce - optionnel):\nExemple: Paris B 123 456 789'
+      : 'Trade Register (RCS - optional):\nExample: Paris B 123 456 789';
+
+    const rcsResponse = ui.prompt(
+      'RCS',
+      rcsPrompt,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (rcsResponse.getSelectedButton() === ui.Button.OK) {
+      result.rcs = rcsResponse.getResponseText().trim();
+    }
+
+    // Capital social
+    const capitalPrompt = isFrench
+      ? 'Capital social (optionnel):\nExemple: 10 000 EUR'
+      : 'Share Capital (optional):\nExample: 10,000 EUR';
+
+    const capitalResponse = ui.prompt(
+      isFrench ? 'Capital Social' : 'Share Capital',
+      capitalPrompt,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (capitalResponse.getSelectedButton() === ui.Button.OK) {
+      result.capital = capitalResponse.getResponseText().trim();
+    }
+
+    // Forme juridique
+    const legalFormPrompt = isFrench
+      ? 'Forme juridique (optionnel):\nExemples: SARL, SAS, EURL, SA'
+      : 'Legal Form (optional):\nExamples: SARL, SAS, EURL, SA';
+
+    const legalFormResponse = ui.prompt(
+      isFrench ? 'Forme Juridique' : 'Legal Form',
+      legalFormPrompt,
+      ui.ButtonSet.OK_CANCEL
+    );
+
+    if (legalFormResponse.getSelectedButton() === ui.Button.OK) {
+      result.legalForm = legalFormResponse.getResponseText().trim();
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Collects Cameroon legal IDs (NIU, RCCM, Tax Center)
+ * @param {Object} ui - SpreadsheetApp UI object
+ * @param {boolean} isFrench - True if French language
+ * @returns {Object} Cameroon legal IDs
+ */
+function collectCameroonLegalIds(ui, isFrench) {
+  const result = {};
+
+  // NIU (MANDATORY for Cameroon)
+  const niuPrompt = isFrench
+    ? 'Numero d\'Identification Unique (NIU - OBLIGATOIRE):\nExemple: M012345678901A'
+    : 'Tax Identification Number (NIU - REQUIRED):\nExample: M012345678901A';
+
+  const niuResponse = ui.prompt(
+    'NIU',
+    niuPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (niuResponse.getSelectedButton() === ui.Button.OK) {
+    result.niu = niuResponse.getResponseText().trim();
+  }
+
+  // RCCM (MANDATORY for Cameroon)
+  const rccmPrompt = isFrench
+    ? 'Numero RCCM (OBLIGATOIRE):\nExemple: RC/DLA/2023/B/1234'
+    : 'Trade Register Number (RCCM - REQUIRED):\nExample: RC/DLA/2023/B/1234';
+
+  const rccmResponse = ui.prompt(
+    'RCCM',
+    rccmPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (rccmResponse.getSelectedButton() === ui.Button.OK) {
+    result.rccm = rccmResponse.getResponseText().trim();
+  }
+
+  // Tax Center (MANDATORY for Cameroon)
+  const taxCenterPrompt = isFrench
+    ? 'Centre des impots de rattachement (OBLIGATOIRE):\nExemple: CSI Douala-Bonanjo'
+    : 'Tax Center (REQUIRED):\nExample: CSI Douala-Bonanjo';
+
+  const taxCenterResponse = ui.prompt(
+    isFrench ? 'Centre des Impots' : 'Tax Center',
+    taxCenterPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (taxCenterResponse.getSelectedButton() === ui.Button.OK) {
+    result.taxCenter = taxCenterResponse.getResponseText().trim();
+  }
+
+  return result;
+}
+
+/**
+ * Collects US legal IDs (EIN, State Tax ID)
+ * @param {Object} ui - SpreadsheetApp UI object
+ * @param {boolean} isFrench - True if French language
+ * @returns {Object} US legal IDs
+ */
+function collectUSLegalIds(ui, isFrench) {
+  const result = {};
+
+  // EIN (Optional but recommended)
+  const einPrompt = isFrench
+    ? 'EIN - Employer Identification Number (optionnel):\nExemple: 12-3456789'
+    : 'EIN - Employer Identification Number (optional):\nExample: 12-3456789';
+
+  const einResponse = ui.prompt(
+    'EIN',
+    einPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (einResponse.getSelectedButton() === ui.Button.OK) {
+    result.ein = einResponse.getResponseText().trim();
+  }
+
+  // State Tax ID (Optional)
+  const stateIdPrompt = isFrench
+    ? 'Numero d\'identification fiscale de l\'Etat (optionnel):\nExemple: CA-123456789'
+    : 'State Tax ID (optional):\nExample: CA-123456789';
+
+  const stateIdResponse = ui.prompt(
+    'State Tax ID',
+    stateIdPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (stateIdResponse.getSelectedButton() === ui.Button.OK) {
+    result.stateId = stateIdResponse.getResponseText().trim();
+  }
+
+  // Sales Tax Rate (Optional)
+  const salesTaxPrompt = isFrench
+    ? 'Taux de taxe de vente en % (optionnel):\nExemple: 8.25 pour 8.25%\n(Laissez vide si pas de taxe)'
+    : 'Sales Tax Rate in % (optional):\nExample: 8.25 for 8.25%\n(Leave empty if no sales tax)';
+
+  const salesTaxResponse = ui.prompt(
+    'Sales Tax Rate',
+    salesTaxPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (salesTaxResponse.getSelectedButton() === ui.Button.OK) {
+    const rateStr = salesTaxResponse.getResponseText().trim();
+    const rate = parseFloat(rateStr);
+    if (!isNaN(rate)) {
+      result.salesTaxRate = rate;
+    }
+  }
+
+  return result;
+}
+
+// ============================================================================
+// BANK DETAILS COLLECTION / COLLECTE COORDONNEES BANCAIRES
+// ============================================================================
+
+/**
+ * Collects bank details (optional)
+ * Collecte les coordonnees bancaires (optionnel)
+ * @param {Object} ui - SpreadsheetApp UI object
+ * @param {string} lang - Language code
+ * @returns {Object} Bank details object
+ */
+function collectBankDetails(ui, lang) {
+  const isFrench = lang === 'FR';
+  const result = {};
+
+  // Ask if user wants to add bank details
+  const askBankPrompt = isFrench
+    ? 'Voulez-vous ajouter vos coordonnees bancaires?\n(Elles apparaitront sur les factures)'
+    : 'Do you want to add your bank details?\n(They will appear on invoices)';
+
+  const askBankResponse = ui.alert(
+    isFrench ? 'Coordonnees Bancaires' : 'Bank Details',
+    askBankPrompt,
+    ui.ButtonSet.YES_NO
+  );
+
+  if (askBankResponse !== ui.Button.YES) {
+    return result;
+  }
+
+  // Bank Name
+  const bankNamePrompt = isFrench
+    ? 'Nom de la banque:\nExemple: BNP Paribas'
+    : 'Bank Name:\nExample: Chase Bank';
+
+  const bankNameResponse = ui.prompt(
+    isFrench ? 'Nom de la Banque' : 'Bank Name',
+    bankNamePrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (bankNameResponse.getSelectedButton() === ui.Button.OK) {
+    result.bankName = bankNameResponse.getResponseText().trim();
+  }
+
+  // IBAN
+  const ibanPrompt = isFrench
+    ? 'IBAN:\nExemple: FR76 1234 5678 9012 3456 7890 123'
+    : 'IBAN:\nExample: FR76 1234 5678 9012 3456 7890 123';
+
+  const ibanResponse = ui.prompt(
+    'IBAN',
+    ibanPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (ibanResponse.getSelectedButton() === ui.Button.OK) {
+    result.bankIban = ibanResponse.getResponseText().trim();
+  }
+
+  // BIC/SWIFT
+  const bicPrompt = isFrench
+    ? 'BIC/SWIFT:\nExemple: BNPAFRPP'
+    : 'BIC/SWIFT:\nExample: BNPAFRPP';
+
+  const bicResponse = ui.prompt(
+    'BIC/SWIFT',
+    bicPrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (bicResponse.getSelectedButton() === ui.Button.OK) {
+    result.bankBic = bicResponse.getResponseText().trim();
+  }
+
+  // Account Holder Name
+  const accountNamePrompt = isFrench
+    ? 'Titulaire du compte:\nExemple: SARL Mon Entreprise'
+    : 'Account Holder Name:\nExample: My Company LLC';
+
+  const accountNameResponse = ui.prompt(
+    isFrench ? 'Titulaire du Compte' : 'Account Holder',
+    accountNamePrompt,
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (accountNameResponse.getSelectedButton() === ui.Button.OK) {
+    result.bankAccountName = accountNameResponse.getResponseText().trim();
+  }
+
+  return result;
 }
 
 // ============================================================================
@@ -249,11 +636,11 @@ function collectCompanyInfo(lang) {
 // ============================================================================
 
 /**
- * Automatically fills the Settings sheet with collected information
- * Remplit automatiquement la feuille Settings avec les informations collectées
+ * Automatically fills the Settings sheet with collected information (multi-country edition)
+ * Remplit automatiquement la feuille Settings avec les informations collectees
  * @param {string} templateId - Template document ID
  * @param {string} folderId - Drive folder ID
- * @param {Object} companyInfo - Company information
+ * @param {Object} companyInfo - Company information (with country-specific IDs)
  * @returns {boolean} True if successful
  */
 function autoConfigureSettings(templateId, folderId, companyInfo) {
@@ -261,7 +648,7 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let settingsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.SETTINGS);
 
-    // Create Settings sheet if it doesn't exist / Créer si n'existe pas
+    // Create Settings sheet if it doesn't exist / Creer si n'existe pas
     if (!settingsSheet) {
       settingsSheet = ss.insertSheet(INVOICE_CONFIG.SHEETS.SETTINGS);
     }
@@ -269,41 +656,183 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
     // Clear existing content / Effacer le contenu existant
     settingsSheet.clear();
 
-    // Set headers / Définir les en-têtes
+    // Set headers / Definir les en-tetes
     settingsSheet.getRange(1, 1, 1, 2)
       .setValues([['Parameter', 'Value']])
       .setFontWeight('bold')
       .setBackground('#4285F4')
       .setFontColor('#FFFFFF');
 
-    // Fill configuration / Remplir la configuration
+    // Get country-specific currency settings
+    const currencySettings = getCurrencySettingsForCountry(companyInfo.country);
+
+    // Build configuration data / Construire les donnees de configuration
     const configData = [
+      // System settings
       [INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID, templateId],
       [INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID, folderId],
       [INVOICE_CONFIG.PARAM_KEYS.SENDER_EMAIL, companyInfo.email],
       [INVOICE_CONFIG.PARAM_KEYS.AUTO_SEND_EMAIL, 'false'],
+      ['LOCALE', companyInfo.locale || 'EN'],
+
+      // Country
+      [INVOICE_CONFIG.PARAM_KEYS.COUNTRY, companyInfo.country || 'FR'],
+
+      // Company basic info
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_NAME, companyInfo.name],
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_ADDRESS, companyInfo.address],
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE, companyInfo.phone],
       [INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL, companyInfo.email],
+
+      // Invoice settings
       [INVOICE_CONFIG.PARAM_KEYS.INVOICE_PREFIX, 'INV' + new Date().getFullYear() + '-'],
-      // Note: LAST_INVOICE_NUMBER no longer needed - IDs are auto-generated by scanning existing invoices
-      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_SYMBOL, '€'],
-      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_CODE, 'EUR'],
-      ['LOCALE', companyInfo.locale || 'EN']  // Default language preference
+      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_SYMBOL, currencySettings.symbol],
+      [INVOICE_CONFIG.PARAM_KEYS.CURRENCY_CODE, currencySettings.code],
     ];
 
+    // Add country-specific legal IDs based on country
+    switch (companyInfo.country) {
+      case 'FR':
+        // France-specific IDs
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_SIRET, companyInfo.siret || '']);
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.IS_AUTO_ENTREPRENEUR, companyInfo.isAutoEntrepreneur ? 'true' : 'false']);
+        if (!companyInfo.isAutoEntrepreneur) {
+          configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_VAT_FR, companyInfo.vatFR || '']);
+          configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCS, companyInfo.rcs || '']);
+          configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_CAPITAL, companyInfo.capital || '']);
+          configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_LEGAL_FORM, companyInfo.legalForm || '']);
+        }
+        // Default VAT rate for France
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_VAT_RATE, companyInfo.isAutoEntrepreneur ? '0' : '20']);
+        break;
+
+      case 'CM':
+        // Cameroon-specific IDs (all MANDATORY)
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_NIU, companyInfo.niu || '']);
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCCM, companyInfo.rccm || '']);
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_TAX_CENTER, companyInfo.taxCenter || '']);
+        // Default VAT rate for Cameroon (TVA 19.25%)
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_VAT_RATE, '19.25']);
+        break;
+
+      case 'US':
+        // US-specific IDs (optional)
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_EIN, companyInfo.ein || '']);
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.COMPANY_STATE_ID, companyInfo.stateId || '']);
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.SALES_TAX_RATE, companyInfo.salesTaxRate || '0']);
+        // Default VAT/Sales Tax rate for US
+        configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_VAT_RATE, companyInfo.salesTaxRate || '0']);
+        break;
+    }
+
+    // Add bank details (if provided)
+    if (companyInfo.bankName) {
+      configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_NAME, companyInfo.bankName]);
+    }
+    if (companyInfo.bankIban) {
+      configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_IBAN, companyInfo.bankIban]);
+    }
+    if (companyInfo.bankBic) {
+      configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_BIC, companyInfo.bankBic]);
+    }
+    if (companyInfo.bankAccountName) {
+      configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_ACCOUNT_NAME, companyInfo.bankAccountName]);
+    }
+
+    // Add payment terms based on country
+    const paymentTerms = getDefaultPaymentTermsForCountry(companyInfo.country, companyInfo.locale);
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_TERMS, paymentTerms.terms]);
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_DAYS, paymentTerms.days.toString()]);
+
+    // Write all data to sheet
     settingsSheet.getRange(2, 1, configData.length, 2).setValues(configData);
 
     // Auto-resize columns / Redimensionner les colonnes
     settingsSheet.autoResizeColumns(1, 2);
 
-    Logger.log('✅ Settings sheet configured');
+    // Add section separators for readability
+    formatSettingsSheet(settingsSheet);
+
+    Logger.log('Settings sheet configured for country: ' + companyInfo.country);
     return true;
 
   } catch (error) {
-    Logger.log('❌ Error configuring settings: ' + error);
+    Logger.log('Error configuring settings: ' + error);
     return false;
+  }
+}
+
+/**
+ * Gets currency settings based on country
+ * @param {string} country - Country code
+ * @returns {Object} {symbol, code}
+ */
+function getCurrencySettingsForCountry(country) {
+  switch (country) {
+    case 'FR':
+      return { symbol: 'EUR', code: 'EUR' };
+    case 'CM':
+      return { symbol: 'FCFA', code: 'XAF' };
+    case 'US':
+      return { symbol: '$', code: 'USD' };
+    default:
+      return { symbol: 'EUR', code: 'EUR' };
+  }
+}
+
+/**
+ * Gets default payment terms based on country and language
+ * @param {string} country - Country code
+ * @param {string} locale - Language code
+ * @returns {Object} {terms, days}
+ */
+function getDefaultPaymentTermsForCountry(country, locale) {
+  const isFrench = locale === 'FR' || country === 'FR' || country === 'CM';
+
+  switch (country) {
+    case 'FR':
+      return {
+        terms: isFrench ? 'Paiement a reception' : 'Payment upon receipt',
+        days: 30
+      };
+    case 'CM':
+      return {
+        terms: isFrench ? 'Paiement comptant' : 'Cash payment',
+        days: 0
+      };
+    case 'US':
+      return {
+        terms: 'Net 30',
+        days: 30
+      };
+    default:
+      return {
+        terms: isFrench ? 'Paiement a reception' : 'Payment upon receipt',
+        days: 30
+      };
+  }
+}
+
+/**
+ * Formats the Settings sheet with section separators
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - Settings sheet
+ */
+function formatSettingsSheet(sheet) {
+  try {
+    const lastRow = sheet.getLastRow();
+
+    // Apply alternating row colors for readability
+    for (let i = 2; i <= lastRow; i++) {
+      const bgColor = i % 2 === 0 ? '#f8f9fa' : '#ffffff';
+      sheet.getRange(i, 1, 1, 2).setBackground(bgColor);
+    }
+
+    // Make parameter names bold
+    sheet.getRange(2, 1, lastRow - 1, 1).setFontWeight('bold');
+
+  } catch (error) {
+    // Non-critical formatting, ignore errors
+    Logger.log('Warning: Could not format settings sheet: ' + error);
   }
 }
 
@@ -366,14 +895,19 @@ function createTestInvoice(companyInfo) {
     invoicesSheet.appendRow(testData);
 
     // Generate the test invoice / Générer la facture de test
-    // Note: This requires the InvoiceGenerator functions to be updated
-    // For now, just return success
-    // TODO: Call generateInvoiceById('INV2025-CLI-001-0001') once generator is updated
+    const generationResult = generateInvoiceById('INV2025-CLI-001-0001');
+
+    if (generationResult && generationResult.success) {
+      return {
+        success: true,
+        url: generationResult.url || generationResult.docUrl || 'Test invoice generated',
+        message: generationResult.message || 'Test invoice generated successfully'
+      };
+    }
 
     return {
-      success: true,
-      url: 'Test invoice row added successfully',
-      message: 'You can now generate it using the Invoices menu'
+      success: false,
+      message: (generationResult && generationResult.message) || 'Failed to generate test invoice'
     };
 
   } catch (error) {

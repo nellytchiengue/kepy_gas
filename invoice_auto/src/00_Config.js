@@ -1,9 +1,9 @@
 /**
  * @file 00_Config.js
  * @description Centralized configuration for automatic invoice generation system
- *              Configuration centralisée pour le système de génération de factures automatiques
- * @version 1.2 (Services Edition)
- * @date 2025-12-13
+ *              Configuration centralisee pour le systeme de generation de factures automatiques
+ * @version 2.0 (Multi-Country Edition - FR/CM/US)
+ * @date 2025-12-14
  * @author InvoiceFlash - One-Click Invoice Generator
  */
 
@@ -51,11 +51,19 @@ const INVOICE_CONFIG = {
   // INDEX DES COLONNES (base 0) DANS LA FEUILLE "CLIENTS"
   // ---------------------------------------------------------------------------
   CLIENT_COLUMNS: {
-    CLIENT_ID: 0,        // Column A - Unique client ID (ex: CLI-001)
-    CLIENT_NAME: 1,      // Column B - Client name
-    CLIENT_EMAIL: 2,     // Column C - Client email
-    CLIENT_PHONE: 3,     // Column D - Client phone
-    CLIENT_ADDRESS: 4    // Column E - Client address
+    CLIENT_ID: 0,           // Column A - Unique client ID (ex: CLI-001)
+    CLIENT_NAME: 1,         // Column B - Client name
+    CLIENT_EMAIL: 2,        // Column C - Client email
+    CLIENT_PHONE: 3,        // Column D - Client phone
+    CLIENT_ADDRESS: 4,      // Column E - Client address
+    CLIENT_COUNTRY: 5,      // Column F - Client country (FR, CM, US)
+    CLIENT_SIRET: 6,        // Column G - Client SIRET (France)
+    CLIENT_VAT_NUMBER: 7,   // Column H - Client VAT number (France)
+    CLIENT_NIU: 8,          // Column I - Client NIU (Cameroon)
+    CLIENT_TAX_ID: 9,       // Column J - Client Tax ID (USA)
+    PAYMENT_TERMS: 10,      // Column K - Payment terms (e.g., "30 days")
+    NOTES: 11,              // Column L - Internal notes
+    ACTIVE: 12              // Column M - Is client active (TRUE/FALSE)
   },
 
   // ---------------------------------------------------------------------------
@@ -68,7 +76,9 @@ const INVOICE_CONFIG = {
     DESCRIPTION: 2,      // Column C - Full description
     DEFAULT_PRICE: 3,    // Column D - Default unit price
     CATEGORY: 4,         // Column E - Category (optional)
-    ACTIVE: 5            // Column F - Is active (TRUE/FALSE)
+    VAT_RATE: 5,         // Column F - VAT rate for this service (%)
+    UNIT: 6,             // Column G - Unit (hour, day, piece, etc.)
+    ACTIVE: 7            // Column H - Is active (TRUE/FALSE)
   },
 
   // ---------------------------------------------------------------------------
@@ -104,63 +114,203 @@ const INVOICE_CONFIG = {
 
   // ---------------------------------------------------------------------------
   // PARAMETER KEYS FOR "SETTINGS" SHEET
-  // CLÉS POUR LA FEUILLE "SETTINGS"
+  // CLES POUR LA FEUILLE "SETTINGS"
   // ---------------------------------------------------------------------------
   PARAM_KEYS: {
+    // General / General
     TEMPLATE_DOCS_ID: 'TEMPLATE_DOCS_ID',           // Google Docs template ID
     DRIVE_FOLDER_ID: 'DRIVE_FOLDER_ID',             // Drive destination folder ID
     SENDER_EMAIL: 'SENDER_EMAIL',                   // Email for sending invoices
     AUTO_SEND_EMAIL: 'AUTO_SEND_EMAIL',             // Auto-send flag (true/false)
+    INVOICE_PREFIX: 'INVOICE_PREFIX',               // Invoice number prefix (ex: INV2025-)
+    LAST_INVOICE_NUMBER: 'LAST_INVOICE_NUMBER',     // Last used invoice number (auto-increment)
+
+    // Country & Currency / Pays et Devise
+    COUNTRY: 'COUNTRY',                             // Country code (FR, CM, US)
+    CURRENCY_SYMBOL: 'CURRENCY_SYMBOL',             // Currency symbol (ex: EUR, $, FCFA)
+    CURRENCY_CODE: 'CURRENCY_CODE',                 // Currency code (ex: EUR, USD, XAF)
+    DATE_FORMAT: 'DATE_FORMAT',                     // Date format (DD/MM/YYYY or MM/DD/YYYY)
+
+    // Company Basic Info / Infos Entreprise de Base
     COMPANY_NAME: 'COMPANY_NAME',                   // Company name
     COMPANY_ADDRESS: 'COMPANY_ADDRESS',             // Company address
     COMPANY_PHONE: 'COMPANY_PHONE',                 // Company phone
     COMPANY_EMAIL: 'COMPANY_EMAIL',                 // Company email
-    INVOICE_PREFIX: 'INVOICE_PREFIX',               // Invoice number prefix (ex: INV2025-)
-    LAST_INVOICE_NUMBER: 'LAST_INVOICE_NUMBER',     // Last used invoice number (auto-increment)
-    CURRENCY_SYMBOL: 'CURRENCY_SYMBOL',             // Currency symbol (ex: €, $, FCFA)
-    CURRENCY_CODE: 'CURRENCY_CODE'                  // Currency code (ex: EUR, USD, XAF)
+    COMPANY_WEBSITE: 'COMPANY_WEBSITE',             // Company website
+    COMPANY_LOGO_URL: 'COMPANY_LOGO_URL',           // Company logo URL
+
+    // France (FR) Legal IDs / Identifiants Legaux France
+    COMPANY_SIRET: 'COMPANY_SIRET',                 // SIRET (14 digits)
+    COMPANY_SIREN: 'COMPANY_SIREN',                 // SIREN (9 digits)
+    COMPANY_VAT_FR: 'COMPANY_VAT_FR',               // N TVA Intracommunautaire
+    COMPANY_RCS: 'COMPANY_RCS',                     // RCS + City
+    COMPANY_CAPITAL: 'COMPANY_CAPITAL',             // Capital social
+    COMPANY_LEGAL_FORM: 'COMPANY_LEGAL_FORM',       // Forme juridique (SARL, SAS, etc.)
+    COMPANY_APE_CODE: 'COMPANY_APE_CODE',           // Code APE/NAF
+    IS_AUTO_ENTREPRENEUR: 'IS_AUTO_ENTREPRENEUR',   // Auto-entrepreneur regime (true/false)
+
+    // Cameroon (CM) Legal IDs / Identifiants Legaux Cameroun
+    COMPANY_NIU: 'COMPANY_NIU',                     // NIU (Numero Identifiant Unique)
+    COMPANY_RCCM: 'COMPANY_RCCM',                   // RCCM (Registre Commerce)
+    COMPANY_TAX_CENTER: 'COMPANY_TAX_CENTER',       // Centre des impots de rattachement
+
+    // USA (US) Legal IDs / Identifiants Legaux USA
+    COMPANY_EIN: 'COMPANY_EIN',                     // EIN (Employer Identification Number)
+    COMPANY_STATE_ID: 'COMPANY_STATE_ID',           // State Tax ID
+    SALES_TAX_RATE: 'SALES_TAX_RATE',               // Sales tax rate (%)
+
+    // Bank Details / Coordonnees Bancaires
+    BANK_NAME: 'BANK_NAME',                         // Bank name
+    BANK_IBAN: 'BANK_IBAN',                         // IBAN
+    BANK_BIC: 'BANK_BIC',                           // BIC/SWIFT
+    BANK_ACCOUNT_NAME: 'BANK_ACCOUNT_NAME',         // Account holder name
+
+    // VAT/Tax Settings / Parametres TVA
+    DEFAULT_VAT_RATE: 'DEFAULT_VAT_RATE',           // Default VAT rate
+    VAT_RATES_LIST: 'VAT_RATES_LIST',               // Comma-separated VAT rates (e.g., "20,10,5.5,0")
+
+    // Payment Terms / Conditions de Paiement
+    DEFAULT_PAYMENT_TERMS: 'DEFAULT_PAYMENT_TERMS', // Default payment terms text
+    DEFAULT_PAYMENT_DAYS: 'DEFAULT_PAYMENT_DAYS'    // Default payment days (e.g., 30)
   },
 
   // ---------------------------------------------------------------------------
   // MARKERS USED IN GOOGLE DOCS TEMPLATE
-  // MARQUEURS UTILISÉS DANS LE TEMPLATE GOOGLE DOCS
-  // Changed from <<>> to {{}} for market standard / Changé de <<>> vers {{}}
+  // MARQUEURS UTILISES DANS LE TEMPLATE GOOGLE DOCS
+  // Changed from <<>> to {{}} for market standard / Change de <<>> vers {{}}
   // ---------------------------------------------------------------------------
   MARKERS: {
-    // Company information / Informations entreprise
+    // =========================================================================
+    // COMPANY INFORMATION / INFORMATIONS ENTREPRISE
+    // =========================================================================
     COMPANY_NAME: '{{COMPANY_NAME}}',
     COMPANY_ADDRESS: '{{COMPANY_ADDRESS}}',
     COMPANY_PHONE: '{{COMPANY_PHONE}}',
     COMPANY_EMAIL: '{{COMPANY_EMAIL}}',
+    COMPANY_WEBSITE: '{{COMPANY_WEBSITE}}',
+    COMPANY_LOGO: '{{COMPANY_LOGO}}',
 
-    // Invoice information / Informations facture
-    INVOICE_ID: '{{INVOICE_ID}}',
-    INVOICE_DATE: '{{INVOICE_DATE}}',
+    // Company Legal IDs Block (generated dynamically based on country)
+    COMPANY_LEGAL_IDS: '{{COMPANY_LEGAL_IDS}}',
 
-    // Client information / Informations client
+    // France (FR) Company IDs
+    COMPANY_SIRET: '{{COMPANY_SIRET}}',
+    COMPANY_SIREN: '{{COMPANY_SIREN}}',
+    COMPANY_VAT_FR: '{{COMPANY_VAT_FR}}',
+    COMPANY_RCS: '{{COMPANY_RCS}}',
+    COMPANY_CAPITAL: '{{COMPANY_CAPITAL}}',
+    COMPANY_LEGAL_FORM: '{{COMPANY_LEGAL_FORM}}',
+    COMPANY_APE_CODE: '{{COMPANY_APE_CODE}}',
+
+    // Cameroon (CM) Company IDs
+    COMPANY_NIU: '{{COMPANY_NIU}}',
+    COMPANY_RCCM: '{{COMPANY_RCCM}}',
+    COMPANY_TAX_CENTER: '{{COMPANY_TAX_CENTER}}',
+
+    // USA (US) Company IDs
+    COMPANY_EIN: '{{COMPANY_EIN}}',
+    COMPANY_STATE_ID: '{{COMPANY_STATE_ID}}',
+
+    // =========================================================================
+    // CLIENT INFORMATION / INFORMATIONS CLIENT
+    // =========================================================================
     CLIENT_NAME: '{{CLIENT_NAME}}',
     CLIENT_EMAIL: '{{CLIENT_EMAIL}}',
     CLIENT_PHONE: '{{CLIENT_PHONE}}',
     CLIENT_ADDRESS: '{{CLIENT_ADDRESS}}',
 
-    // Transaction details / Détails de la transaction
+    // Client Legal IDs Block (generated dynamically based on country)
+    CLIENT_LEGAL_IDS: '{{CLIENT_LEGAL_IDS}}',
+
+    // France (FR) Client IDs
+    CLIENT_SIRET: '{{CLIENT_SIRET}}',
+    CLIENT_VAT_NUMBER: '{{CLIENT_VAT_NUMBER}}',
+
+    // Cameroon (CM) Client IDs
+    CLIENT_NIU: '{{CLIENT_NIU}}',
+
+    // USA (US) Client IDs
+    CLIENT_TAX_ID: '{{CLIENT_TAX_ID}}',
+
+    // =========================================================================
+    // INVOICE INFORMATION / INFORMATIONS FACTURE
+    // =========================================================================
+    INVOICE_ID: '{{INVOICE_ID}}',
+    INVOICE_DATE: '{{INVOICE_DATE}}',
+    INVOICE_DUE_DATE: '{{INVOICE_DUE_DATE}}',
+    DELIVERY_DATE: '{{DELIVERY_DATE}}',
+    PO_NUMBER: '{{PO_NUMBER}}',
+    PAYMENT_TERMS: '{{PAYMENT_TERMS}}',
+
+    // =========================================================================
+    // LINE ITEMS / LIGNES DE FACTURE
+    // =========================================================================
     DESCRIPTION: '{{DESCRIPTION}}',
     QUANTITY: '{{QUANTITY}}',
     UNIT_PRICE: '{{UNIT_PRICE}}',
-    TVA: '{{TVA}}',
-    TOTAL_AMOUNT: '{{TOTAL_AMOUNT}}',
-    AMOUNT_IN_WORDS: '{{AMOUNT_IN_WORDS}}',
+    LINE_VAT_RATE: '{{LINE_VAT_RATE}}',
+    LINE_VAT_AMOUNT: '{{LINE_VAT_AMOUNT}}',
+    LINE_TOTAL: '{{LINE_TOTAL}}',
 
-    // Invoice labels (translated according to language)
+    // Items Table (for multi-line invoices - generated dynamically)
+    ITEMS_TABLE: '{{ITEMS_TABLE}}',
+
+    // =========================================================================
+    // TOTALS AND AMOUNTS / TOTAUX ET MONTANTS
+    // =========================================================================
+    SUBTOTAL_HT: '{{SUBTOTAL_HT}}',
+    TVA: '{{TVA}}',
+    TVA_SUMMARY: '{{TVA_SUMMARY}}',
+    TOTAL_TVA: '{{TOTAL_TVA}}',
+    TOTAL_TTC: '{{TOTAL_TTC}}',
+    TOTAL_AMOUNT: '{{TOTAL_AMOUNT}}',
+    DISCOUNT: '{{DISCOUNT}}',
+    DEPOSIT_PAID: '{{DEPOSIT_PAID}}',
+    BALANCE_DUE: '{{BALANCE_DUE}}',
+
+    // Amount in words (required for Cameroon)
+    AMOUNT_IN_WORDS: '{{AMOUNT_IN_WORDS}}',
+    AMOUNT_IN_WORDS_BLOCK: '{{AMOUNT_IN_WORDS_BLOCK}}',
+
+    // =========================================================================
+    // BANK DETAILS / COORDONNEES BANCAIRES
+    // =========================================================================
+    BANK_DETAILS: '{{BANK_DETAILS}}',
+    BANK_NAME: '{{BANK_NAME}}',
+    BANK_IBAN: '{{BANK_IBAN}}',
+    BANK_BIC: '{{BANK_BIC}}',
+    BANK_ACCOUNT_NAME: '{{BANK_ACCOUNT_NAME}}',
+
+    // =========================================================================
+    // LEGAL FOOTER / MENTIONS LEGALES
+    // =========================================================================
+    LEGAL_FOOTER: '{{LEGAL_FOOTER}}',
+    VAT_EXEMPTION_NOTICE: '{{VAT_EXEMPTION_NOTICE}}',
+    LATE_PAYMENT_NOTICE: '{{LATE_PAYMENT_NOTICE}}',
+    SALES_TAX_NOTICE: '{{SALES_TAX_NOTICE}}',
+
+    // =========================================================================
+    // LABELS (TRANSLATED) / ETIQUETTES (TRADUITES)
+    // =========================================================================
     LABEL_INVOICE: '{{LABEL_INVOICE}}',
     LABEL_INVOICE_NUMBER: '{{LABEL_INVOICE_NUMBER}}',
     LABEL_DATE: '{{LABEL_DATE}}',
+    LABEL_DUE_DATE: '{{LABEL_DUE_DATE}}',
+    LABEL_DELIVERY_DATE: '{{LABEL_DELIVERY_DATE}}',
     LABEL_BILLED_TO: '{{LABEL_BILLED_TO}}',
     LABEL_DESCRIPTION: '{{LABEL_DESCRIPTION}}',
     LABEL_QTY: '{{LABEL_QTY}}',
     LABEL_UNIT_PRICE: '{{LABEL_UNIT_PRICE}}',
     LABEL_TVA: '{{LABEL_TVA}}',
+    LABEL_TVA_RATE: '{{LABEL_TVA_RATE}}',
     LABEL_TOTAL: '{{LABEL_TOTAL}}',
+    LABEL_SUBTOTAL: '{{LABEL_SUBTOTAL}}',
+    LABEL_TOTAL_VAT: '{{LABEL_TOTAL_VAT}}',
+    LABEL_TOTAL_TTC: '{{LABEL_TOTAL_TTC}}',
+    LABEL_TOTAL_DUE: '{{LABEL_TOTAL_DUE}}',
+    LABEL_PAYMENT_TERMS: '{{LABEL_PAYMENT_TERMS}}',
+    LABEL_BANK_DETAILS: '{{LABEL_BANK_DETAILS}}',
+    LABEL_NOTES: '{{LABEL_NOTES}}',
     LABEL_FOOTER: '{{LABEL_FOOTER}}'
   },
 
@@ -216,8 +366,8 @@ const INVOICE_CONFIG = {
   // ---------------------------------------------------------------------------
   APP: {
     NAME: 'InvoiceFlash',
-    VERSION: '1.2',
-    TAGLINE: 'One-Click Invoice Generator',
+    VERSION: '2.0',
+    TAGLINE: 'Multi-Country Invoice Generator (FR/CM/US)',
     AUTHOR: 'Nelly TCHIENGUE',
     LICENSE: 'Commercial - Single User License',
     SUPPORT_EMAIL: 'nelly@tpmn.app'
@@ -432,6 +582,7 @@ const INVOICE_LABELS = {
     LABEL_INVOICE: 'INVOICE',
     LABEL_INVOICE_NUMBER: 'Invoice #',
     LABEL_DATE: 'Date',
+    LABEL_DUE_DATE: 'Due Date',
     LABEL_BILLED_TO: 'Billed To / Client',
     LABEL_DESCRIPTION: 'DESCRIPTION',
     LABEL_QTY: 'QTY',
@@ -445,9 +596,10 @@ const INVOICE_LABELS = {
     LABEL_INVOICE: 'FACTURE',
     LABEL_INVOICE_NUMBER: 'Facture n°',
     LABEL_DATE: 'Date',
+    LABEL_DUE_DATE: "Date d'échéance",
     LABEL_BILLED_TO: 'Facturé à / Client',
     LABEL_DESCRIPTION: 'DESCRIPTION',
-    LABEL_QTY: 'QTÉ',
+    LABEL_QTY: 'QUANTITÉ',
     LABEL_UNIT_PRICE: 'PRIX UNITAIRE',
     LABEL_TVA: 'TVA',
     LABEL_TOTAL: 'TOTAL',

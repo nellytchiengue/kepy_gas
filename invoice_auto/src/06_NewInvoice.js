@@ -1,9 +1,10 @@
 /**
  * @file 06_NewInvoice.js
  * @description Ajout de nouvelles factures avec interface HTML moderne
- *              Supporte la création de nouveaux clients ET la sélection de services
- * @version 2.0
- * @date 2025-12-13
+ *              Supporte la creation de nouveaux clients ET la selection de services
+ *              Multi-country support with legal ID fields (FR/CM/US)
+ * @version 2.1 (Multi-Country Edition)
+ * @date 2025-12-14
  */
 
 // ============================================================================
@@ -15,10 +16,10 @@ function getAllClients() {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const clientsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.CLIENTS);
     if (!clientsSheet) return [];
-    
+
     const data = clientsSheet.getDataRange().getValues();
     const clients = [];
-    
+
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_NAME]) {
@@ -27,7 +28,13 @@ function getAllClients() {
           name: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_NAME] || '',
           email: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_EMAIL] || '',
           phone: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_PHONE] || '',
-          address: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_ADDRESS] || ''
+          address: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_ADDRESS] || '',
+          // Country-specific legal IDs
+          country: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_COUNTRY] || '',
+          siret: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_SIRET] || '',
+          vatNumber: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_VAT_NUMBER] || '',
+          niu: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_NIU] || '',
+          taxId: row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_TAX_ID] || ''
         });
       }
     }
@@ -69,32 +76,65 @@ function createNewClient(clientData) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let clientsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.CLIENTS);
-    
+    const country = getParam('COUNTRY') || 'FR';
+
     if (!clientsSheet) {
       clientsSheet = ss.insertSheet(INVOICE_CONFIG.SHEETS.CLIENTS);
-      const headers = ['ClientID', 'ClientName', 'ClientEmail', 'ClientPhone', 'ClientAddress'];
+      // Extended headers with legal IDs
+      const headers = [
+        'ClientID', 'ClientName', 'ClientEmail', 'ClientPhone', 'ClientAddress',
+        'ClientCountry', 'ClientSIRET', 'ClientVATNumber', 'ClientNIU', 'ClientTaxID',
+        'PaymentTerms', 'Notes', 'Active'
+      ];
       clientsSheet.getRange(1, 1, 1, headers.length)
         .setValues([headers])
         .setFontWeight('bold')
         .setBackground('#c0392b')
         .setFontColor('#FFFFFF');
     }
-    
+
     const existingClient = getClientByName(clientData.name);
     if (existingClient) {
-      return { success: false, message: 'Client déjà existant' };
+      return { success: false, message: 'Client deja existant' };
     }
-    
+
     const clientId = generateNextClientId();
-    const newRow = [clientId, clientData.name, clientData.email || '', clientData.phone || '', clientData.address || ''];
+
+    // Build row with country-specific fields
+    const newRow = [
+      clientId,
+      clientData.name,
+      clientData.email || '',
+      clientData.phone || '',
+      clientData.address || '',
+      clientData.country || country,  // Default to company country
+      clientData.siret || '',         // France
+      clientData.vatNumber || '',     // France (EU VAT)
+      clientData.niu || '',           // Cameroon
+      clientData.taxId || '',         // USA
+      clientData.paymentTerms || '',
+      clientData.notes || '',
+      true                            // Active by default
+    ];
     clientsSheet.appendRow(newRow);
-    
-    logSuccess('createNewClient', 'Client ' + clientId + ' créé');
-    
+
+    logSuccess('createNewClient', 'Client ' + clientId + ' cree');
+
     return {
       success: true,
       clientId: clientId,
-      clientInfo: { id: clientId, name: clientData.name, email: clientData.email || '', phone: clientData.phone || '', address: clientData.address || '' }
+      clientInfo: {
+        id: clientId,
+        name: clientData.name,
+        email: clientData.email || '',
+        phone: clientData.phone || '',
+        address: clientData.address || '',
+        country: clientData.country || country,
+        siret: clientData.siret || '',
+        vatNumber: clientData.vatNumber || '',
+        niu: clientData.niu || '',
+        taxId: clientData.taxId || ''
+      }
     };
   } catch (error) {
     logError('createNewClient', 'Erreur', error);
@@ -123,8 +163,11 @@ function getNewInvoiceFormHtml() {
   const hasClients = clients.length > 0;
   const hasServices = services.length > 0;
 
-  // Get currency symbol from Settings
+  // Get country configuration
+  const country = getParam('COUNTRY') || 'FR';
   const currencySymbol = getCurrencySymbol();
+  const defaultVatRate = getDefaultVatRateForCountry(country);
+  const availableVatRates = getAvailableVatRatesForCountry(country);
 
   // Labels bilingues
   const L = lang === 'FR' ? {
@@ -161,7 +204,17 @@ function getNewInvoiceFormHtml() {
     valSelect: 'Sélectionnez un client',
     valService: 'Sélectionnez un service ou entrez une description',
     noServices: 'Aucun service disponible',
-    addServiceHint: 'Ajoutez des services dans l\'onglet Services'
+    addServiceHint: 'Ajoutez des services dans l\'onglet Services',
+    // Legal ID labels
+    legalIdSection: 'Identifiants legaux (optionnel)',
+    siretLabel: 'SIRET',
+    siretPH: '12345678901234',
+    vatNumberLabel: 'N TVA Intracommunautaire',
+    vatNumberPH: 'FR12345678901',
+    niuLabel: 'NIU',
+    niuPH: 'M012345678901A',
+    taxIdLabel: 'Tax ID',
+    taxIdPH: '12-3456789'
   } : {
     title: 'Create Invoice',
     subtitle: 'Fill in the details below',
@@ -196,7 +249,17 @@ function getNewInvoiceFormHtml() {
     valSelect: 'Select a client',
     valService: 'Select a service or enter a description',
     noServices: 'No services available',
-    addServiceHint: 'Add services in the Services tab'
+    addServiceHint: 'Add services in the Services tab',
+    // Legal ID labels
+    legalIdSection: 'Legal IDs (optional)',
+    siretLabel: 'SIRET',
+    siretPH: '12345678901234',
+    vatNumberLabel: 'EU VAT Number',
+    vatNumberPH: 'FR12345678901',
+    niuLabel: 'NIU',
+    niuPH: 'M012345678901A',
+    taxIdLabel: 'Tax ID',
+    taxIdPH: '12-3456789'
   };
   
   // Générer les options clients
@@ -313,7 +376,28 @@ function getNewInvoiceFormHtml() {
   html += '<div class="form-group full-width"><label>' + L.newClientName + ' *</label><input type="text" id="newClientName" placeholder="' + L.namePH + '"></div>';
   html += '<div class="form-group"><label>' + L.newClientEmail + '</label><input type="email" id="newClientEmail" placeholder="' + L.emailPH + '"></div>';
   html += '<div class="form-group"><label>' + L.newClientPhone + '</label><input type="tel" id="newClientPhone" placeholder="' + L.phonePH + '"></div>';
-  html += '<div class="form-group full-width" style="margin-bottom:0"><label>' + L.newClientAddress + '</label><input type="text" id="newClientAddress" placeholder="' + L.addressPH + '"></div>';
+  html += '<div class="form-group full-width"><label>' + L.newClientAddress + '</label><input type="text" id="newClientAddress" placeholder="' + L.addressPH + '"></div>';
+
+  // Country-specific Legal ID fields
+  html += '<div class="form-group full-width" style="margin-top:8px;padding-top:12px;border-top:1px solid var(--gray-200)">';
+  html += '<label style="font-size:11px;color:var(--gray-400);text-transform:uppercase">' + L.legalIdSection + '</label></div>';
+
+  // France: SIRET and VAT Number
+  if (country === 'FR') {
+    html += '<div class="form-group"><label>' + L.siretLabel + '</label><input type="text" id="newClientSiret" placeholder="' + L.siretPH + '" maxlength="14"></div>';
+    html += '<div class="form-group"><label>' + L.vatNumberLabel + '</label><input type="text" id="newClientVatNumber" placeholder="' + L.vatNumberPH + '"></div>';
+  }
+
+  // Cameroon: NIU
+  if (country === 'CM') {
+    html += '<div class="form-group full-width"><label>' + L.niuLabel + '</label><input type="text" id="newClientNiu" placeholder="' + L.niuPH + '"></div>';
+  }
+
+  // USA: Tax ID
+  if (country === 'US') {
+    html += '<div class="form-group full-width"><label>' + L.taxIdLabel + '</label><input type="text" id="newClientTaxId" placeholder="' + L.taxIdPH + '"></div>';
+  }
+
   html += '</div></div>';
   
   // Existing Client Select
@@ -355,7 +439,8 @@ function getNewInvoiceFormHtml() {
   html += '<div class="section"><div class="section-title">💰 ' + L.quantity + ', ' + L.unitPrice + ' & ' + L.tvaRate + '</div>';
   html += '<div class="row"><div class="form-group"><label>' + L.quantity + '</label><input type="number" id="quantity" min="1" value="1" required></div>';
   html += '<div class="form-group"><label>' + L.unitPrice + '</label><div class="input-group"><span class="input-prefix">' + L.currency + '</span><input type="number" id="unitPrice" min="0" step="0.01" placeholder="0.00" required></div></div></div>';
-  html += '<div class="row"><div class="form-group"><label>' + L.tvaRate + '</label><div class="input-group"><span class="input-prefix">%</span><input type="number" id="tvaRate" min="0" max="100" step="0.01" placeholder="20" value="0"></div></div><div class="form-group"></div></div>';
+  // VAT Rate - use country default
+  html += '<div class="row"><div class="form-group"><label>' + L.tvaRate + '</label><div class="input-group"><span class="input-prefix">%</span><input type="number" id="tvaRate" min="0" max="100" step="0.01" placeholder="' + defaultVatRate + '" value="' + defaultVatRate + '"></div></div><div class="form-group"></div></div>';
   html += '<div class="total-display"><span class="total-label">' + L.total + '</span><span class="total-amount" id="totalAmount">' + L.currency + ' 0.00</span></div></div>';
   
   // Status & Buttons
@@ -394,7 +479,14 @@ function getNewInvoiceFormHtml() {
   html += 'var description="";if(isCustomService||!hasServices){description=customDescription?customDescription.value.trim():"";if(!description){alert(L.valService);if(customDescription)customDescription.focus();return;}}else{if(!serviceSelect||!serviceSelect.value){alert(L.valService);if(serviceSelect)serviceSelect.focus();return;}var selectedOption=serviceSelect.options[serviceSelect.selectedIndex];description=selectedOption.dataset.description||serviceSelect.value;}';
   html += 'btn.disabled=true;status.className="status loading";status.innerHTML=\'<div class="spinner"></div><span>\'+L.processing+\'</span>\';';
   html += 'var qty=parseInt(qtyInput.value);var unitPrice=parseFloat(priceInput.value);var tvaRate=parseFloat(tvaRateInput.value)||0;var tvaAmount=(qty*unitPrice)*(tvaRate/100);';
-  html += 'var data={isNewClient:isNewClient,clientName:isNewClient?null:clientSelect.value,newClient:isNewClient?{name:document.getElementById("newClientName").value.trim(),email:document.getElementById("newClientEmail").value.trim(),phone:document.getElementById("newClientPhone").value.trim(),address:document.getElementById("newClientAddress").value.trim()}:null,description:description,quantity:qty,unitPrice:unitPrice,tva:tvaAmount};';
+  // Build new client object with legal IDs (country-specific)
+  html += 'function getNewClientData(){var c={name:document.getElementById("newClientName").value.trim(),email:document.getElementById("newClientEmail").value.trim(),phone:document.getElementById("newClientPhone").value.trim(),address:document.getElementById("newClientAddress").value.trim()};';
+  html += 'var siretEl=document.getElementById("newClientSiret");if(siretEl)c.siret=siretEl.value.trim();';
+  html += 'var vatEl=document.getElementById("newClientVatNumber");if(vatEl)c.vatNumber=vatEl.value.trim();';
+  html += 'var niuEl=document.getElementById("newClientNiu");if(niuEl)c.niu=niuEl.value.trim();';
+  html += 'var taxIdEl=document.getElementById("newClientTaxId");if(taxIdEl)c.taxId=taxIdEl.value.trim();';
+  html += 'return c;}';
+  html += 'var data={isNewClient:isNewClient,clientName:isNewClient?null:clientSelect.value,newClient:isNewClient?getNewClientData():null,description:description,quantity:qty,unitPrice:unitPrice,tva:tvaAmount};';
   html += 'google.script.run.withSuccessHandler(function(r){if(r.success){var msg=r.newClientCreated?L.successWithClient:L.success;status.className="status success";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>\'+msg+\' ID: \'+r.invoiceId+\'</span>\';setTimeout(function(){google.script.host.close();},2000);}else{status.className="status error";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+\': \'+r.message+\'</span>\';btn.disabled=false;}}).withFailureHandler(function(err){status.className="status error";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+\'</span>\';btn.disabled=false;}).processNewInvoiceForm(data);});';
   html += '</script></body></html>';
   

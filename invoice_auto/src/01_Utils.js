@@ -1,8 +1,8 @@
 /**
  * @file 01_Utils.js
- * @description Reusable utility functions / Fonctions utilitaires réutilisables
- * @version 1.1 (Gumroad Edition)
- * @date 2025-12-11
+ * @description Reusable utility functions / Fonctions utilitaires reutilisables
+ * @version 2.0 (Multi-Country Edition - FR/CM/US)
+ * @date 2025-12-14
  * @author InvoiceFlash - One-Click Invoice Generator
  */
 
@@ -45,20 +45,119 @@ function getParam(key) {
 }
 
 /**
- * Retrieves all company parameters
- * Récupère tous les paramètres de l'entreprise
+ * Retrieves all company parameters including legal IDs based on country
+ * Recupere tous les parametres de l'entreprise incluant les identifiants legaux selon le pays
  * @returns {Object} Object containing all company info
  */
 function getCompanyParams() {
-  return {
+  const country = getParam(INVOICE_CONFIG.PARAM_KEYS.COUNTRY) || 'FR';
+
+  // Basic company info (all countries)
+  const params = {
+    // Country
+    country: country,
+
+    // Basic Info
     name: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_NAME) || 'Company Name',
     address: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_ADDRESS) || 'Address not provided',
-    phone: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE) || 'N/A',
-    email: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL) || 'N/A'
+    phone: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE) || '',
+    email: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL) || '',
+    website: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_WEBSITE) || '',
+    logoUrl: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_LOGO_URL) || '',
+
+    // France (FR) Legal IDs
+    siret: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_SIRET) || '',
+    siren: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_SIREN) || '',
+    vatFR: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_VAT_FR) || '',
+    rcs: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCS) || '',
+    capital: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_CAPITAL) || '',
+    legalForm: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_LEGAL_FORM) || '',
+    apeCode: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_APE_CODE) || '',
+    isAutoEntrepreneur: getParam(INVOICE_CONFIG.PARAM_KEYS.IS_AUTO_ENTREPRENEUR) === 'true',
+
+    // Cameroon (CM) Legal IDs
+    niu: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_NIU) || '',
+    rccm: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCCM) || '',
+    taxCenter: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_TAX_CENTER) || '',
+
+    // USA (US) Legal IDs
+    ein: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_EIN) || '',
+    stateId: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_STATE_ID) || '',
+    salesTaxRate: parseFloat(getParam(INVOICE_CONFIG.PARAM_KEYS.SALES_TAX_RATE)) || 0,
+
+    // Bank Details
+    bankName: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_NAME) || '',
+    bankIban: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_IBAN) || '',
+    bankBic: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_BIC) || '',
+    bankAccountName: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_ACCOUNT_NAME) || '',
+
+    // VAT/Tax Settings
+    defaultVatRate: parseFloat(getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_VAT_RATE)) || 0,
+    vatRatesList: getParam(INVOICE_CONFIG.PARAM_KEYS.VAT_RATES_LIST) || '',
+
+    // Payment Terms
+    defaultPaymentTerms: getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_TERMS) || '',
+    defaultPaymentDays: parseInt(getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_DAYS)) || 30
   };
+
+  return params;
 }
 
-// Backward compatibility / Rétrocompatibilité
+/**
+ * Gets company legal IDs formatted as a string for the current country
+ * Recupere les identifiants legaux de l'entreprise formates selon le pays
+ * @param {Object} companyParams - Company parameters (optional, will be fetched if not provided)
+ * @returns {string} Formatted legal IDs string
+ */
+function getCompanyLegalIdsFormatted(companyParams = null) {
+  const params = companyParams || getCompanyParams();
+  const country = params.country || 'FR';
+
+  switch (country) {
+    case 'FR':
+      const frIds = [];
+      if (params.siret) frIds.push(`SIRET: ${params.siret}`);
+      if (params.vatFR && !params.isAutoEntrepreneur) frIds.push(`TVA: ${params.vatFR}`);
+      if (params.rcs) frIds.push(`RCS: ${params.rcs}`);
+      return frIds.join(' | ');
+
+    case 'CM':
+      const cmIds = [];
+      if (params.niu) cmIds.push(`NIU: ${params.niu}`);
+      if (params.rccm) cmIds.push(`RCCM: ${params.rccm}`);
+      if (params.taxCenter) cmIds.push(`Centre: ${params.taxCenter}`);
+      return cmIds.join(' | ');
+
+    case 'US':
+      const usIds = [];
+      if (params.ein) usIds.push(`EIN: ${params.ein}`);
+      if (params.stateId) usIds.push(`State ID: ${params.stateId}`);
+      return usIds.join(' | ');
+
+    default:
+      return '';
+  }
+}
+
+/**
+ * Gets bank details formatted as a string
+ * Recupere les coordonnees bancaires formatees
+ * @param {Object} companyParams - Company parameters (optional)
+ * @returns {string} Formatted bank details
+ */
+function getBankDetailsFormatted(companyParams = null) {
+  const params = companyParams || getCompanyParams();
+  const lines = [];
+
+  if (params.bankName) lines.push(params.bankName);
+  if (params.bankIban) lines.push(`IBAN: ${params.bankIban}`);
+  if (params.bankBic) lines.push(`BIC: ${params.bankBic}`);
+  if (params.bankAccountName) lines.push(`Titulaire: ${params.bankAccountName}`);
+
+  return lines.join('\n');
+}
+
+// Backward compatibility / Retrocompatibilite
 function getEntrepriseParams() {
   return getCompanyParams();
 }
@@ -280,7 +379,104 @@ function convertAmountToWords(amount) {
   return lang === 'FR' ? numberToWordsFR(amount) : numberToWordsEN(amount);
 }
 
-// Backward compatibility / Rétrocompatibilité
+/**
+ * Converts amount to words based on country (with correct currency)
+ * Convertit un montant en lettres selon le pays (avec la devise correcte)
+ * @param {number} amount - Amount to convert
+ * @param {string} country - Country code (FR, CM, US) - optional, uses Settings if not provided
+ * @returns {string} Amount in words with currency
+ */
+function convertAmountToWordsForCountry(amount, country = null) {
+  const countryCode = country || getParam(INVOICE_CONFIG.PARAM_KEYS.COUNTRY) || 'FR';
+
+  switch (countryCode) {
+    case 'FR':
+      return numberToWordsEUR(amount);
+    case 'CM':
+      return numberToWordsFR(amount); // Already returns FCFA
+    case 'US':
+      return numberToWordsEN(amount); // Already returns USD
+    default:
+      return numberToWordsFR(amount);
+  }
+}
+
+/**
+ * Converts a number to words for EURO currency (French)
+ * Convertit un nombre en lettres pour la devise EURO (francais)
+ * @param {number} n - Amount to convert
+ * @returns {string} Amount in words (French with euros)
+ */
+function numberToWordsEUR(n) {
+  if (isNaN(n) || n === 0) return "zero euro";
+
+  const unite = ['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six', 'sept', 'huit', 'neuf'];
+  const dizaine = ['', 'dix', 'vingt', 'trente', 'quarante', 'cinquante', 'soixante', 'soixante', 'quatre-vingt', 'quatre-vingt'];
+  const dix = ['dix', 'onze', 'douze', 'treize', 'quatorze', 'quinze', 'seize', 'dix-sept', 'dix-huit', 'dix-neuf'];
+
+  function numberToWords(num) {
+    if (num < 10) return unite[num];
+    if (num < 20) return dix[num - 10];
+    if (num < 70) {
+      if (num % 10 === 0) return dizaine[Math.floor(num / 10)];
+      if (num % 10 === 1 && Math.floor(num / 10) !== 7) return dizaine[Math.floor(num / 10)] + '-et-' + unite[1];
+      return dizaine[Math.floor(num / 10)] + '-' + unite[num % 10];
+    }
+    if (num < 80) {
+      if (num % 10 === 0) return 'soixante-dix';
+      return 'soixante-' + dix[num - 70];
+    }
+    if (num < 100) {
+      if (num === 80) return 'quatre-vingts';
+      if (num % 10 === 0) return dizaine[Math.floor(num / 10)] + (num > 80 ? 't' : '') + unite[num % 10];
+      if (num > 80 && num < 90) return 'quatre-vingt-' + dix[num - 80];
+      return dizaine[Math.floor(num / 10)] + (num % 10 === 1 && Math.floor(num / 10) !== 7 ? '-et-' : '-') + unite[num % 10];
+    }
+    if (num < 1000) {
+      const cent = (Math.floor(num / 100) === 1) ? 'cent' : unite[Math.floor(num / 100)] + '-cents';
+      const reste = num % 100;
+      if (reste === 0) return cent.replace(/s$/, '');
+      return cent.replace(/s$/, '') + ' ' + numberToWords(reste);
+    }
+    return '';
+  }
+
+  const [euroParts, centParts] = String(n).split('.');
+  const euros = parseInt(euroParts);
+  const centimes = centParts ? parseInt(centParts.padEnd(2, '0').slice(0, 2)) : 0;
+
+  let result = '';
+
+  if (euros > 0) {
+    if (euros < 1000) {
+      result = numberToWords(euros);
+    } else if (euros < 1000000) {
+      const milliers = Math.floor(euros / 1000);
+      const reste = euros % 1000;
+      result = (milliers === 1 ? 'mille' : numberToWords(milliers) + '-mille');
+      if (reste > 0) result += ' ' + numberToWords(reste);
+    } else if (euros < 1000000000) {
+      const millions = Math.floor(euros / 1000000);
+      const reste = euros % 1000000;
+      result = numberToWords(millions) + (millions > 1 ? '-millions' : '-million');
+      if (reste > 0) result += ' ' + numberToWordsEUR(reste).split(' euro')[0];
+    }
+
+    result += (euros > 1 ? ' euros' : ' euro');
+  }
+
+  if (centimes > 0) {
+    if (euros > 0) result += ' et ';
+    result += numberToWords(centimes);
+    result += (centimes > 1 ? ' centimes' : ' centime');
+  } else if (euros === 0) {
+    return "zero euro";
+  }
+
+  return result.charAt(0).toUpperCase() + result.slice(1);
+}
+
+// Backward compatibility / Retrocompatibilite
 function nombreEnToutesLettres(n) {
   return numberToWordsFR(n);
 }

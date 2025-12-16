@@ -26,20 +26,19 @@ function getInvoiceDataById(invoiceId) {
 
     const data = invoicesSheet.getDataRange().getValues();
 
-    // First row contains headers
-    const headers = data[0];
-
-    // Loop through rows to find the InvoiceID (column A)
+    // Loop through rows to find the InvoiceID (column A, skip header row)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const currentInvoiceId = String(row[INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim();
 
       if (currentInvoiceId === String(invoiceId).trim()) {
-        // Build data object
-        return {
+        const clientName = cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]);
+
+        // Build base data object
+        const invoiceData = {
           invoiceId: currentInvoiceId,
           date: row[INVOICE_CONFIG.COLUMNS.DATE],
-          clientName: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]),
+          clientName: clientName,
           clientEmail: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_EMAIL]),
           clientPhone: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_PHONE]),
           clientAddress: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADDRESS]),
@@ -52,6 +51,18 @@ function getInvoiceDataById(invoiceId) {
           pdfUrl: String(row[INVOICE_CONFIG.COLUMNS.PDF_URL] || '').trim(),
           rowIndex: i + 1 // Row index (1-based for Google Sheets)
         };
+
+        // Enrich with client legal IDs from Clients sheet
+        const clientLegalInfo = getClientLegalInfoByName(clientName);
+        if (clientLegalInfo) {
+          invoiceData.clientCountry = clientLegalInfo.country;
+          invoiceData.clientSiret = clientLegalInfo.siret;
+          invoiceData.clientVatNumber = clientLegalInfo.vatNumber;
+          invoiceData.clientNiu = clientLegalInfo.niu;
+          invoiceData.clientTaxId = clientLegalInfo.taxId;
+        }
+
+        return invoiceData;
       }
     }
 
@@ -60,6 +71,44 @@ function getInvoiceDataById(invoiceId) {
 
   } catch (error) {
     logError('getInvoiceDataById', `Error retrieving data`, error);
+    return null;
+  }
+}
+
+/**
+ * Retrieves client legal information from Clients sheet by client name
+ * @param {string} clientName - The client name to search for
+ * @returns {Object|null} Object with legal IDs or null if not found
+ */
+function getClientLegalInfoByName(clientName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const clientsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.CLIENTS);
+
+    if (!clientsSheet) {
+      return null;
+    }
+
+    const data = clientsSheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const name = cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_NAME]);
+
+      if (name === clientName) {
+        return {
+          country: cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_COUNTRY]),
+          siret: cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_SIRET]),
+          vatNumber: cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_VAT_NUMBER]),
+          niu: cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_NIU]),
+          taxId: cleanString(row[INVOICE_CONFIG.CLIENT_COLUMNS.CLIENT_TAX_ID])
+        };
+      }
+    }
+
+    return null;
+  } catch (error) {
+    logError('getClientLegalInfoByName', `Error retrieving client legal info for ${clientName}`, error);
     return null;
   }
 }
@@ -80,7 +129,6 @@ function getInvoicesByStatus(status) {
     }
 
     const data = invoicesSheet.getDataRange().getValues();
-    const headers = data[0];
     const invoices = [];
 
     // Loop through all rows (except header)
@@ -89,10 +137,12 @@ function getInvoicesByStatus(status) {
       const currentStatus = String(row[INVOICE_CONFIG.COLUMNS.STATUS]).trim();
 
       if (currentStatus === status) {
+        const clientName = cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]);
+
         const invoiceData = {
           invoiceId: String(row[INVOICE_CONFIG.COLUMNS.INVOICE_ID]).trim(),
           date: row[INVOICE_CONFIG.COLUMNS.DATE],
-          clientName: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_NAME]),
+          clientName: clientName,
           clientEmail: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_EMAIL]),
           clientPhone: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_PHONE]),
           clientAddress: cleanString(row[INVOICE_CONFIG.COLUMNS.CLIENT_ADDRESS]),
@@ -105,6 +155,16 @@ function getInvoicesByStatus(status) {
           pdfUrl: String(row[INVOICE_CONFIG.COLUMNS.PDF_URL] || '').trim(),
           rowIndex: i + 1
         };
+
+        // Enrich with client legal IDs from Clients sheet
+        const clientLegalInfo = getClientLegalInfoByName(clientName);
+        if (clientLegalInfo) {
+          invoiceData.clientCountry = clientLegalInfo.country;
+          invoiceData.clientSiret = clientLegalInfo.siret;
+          invoiceData.clientVatNumber = clientLegalInfo.vatNumber;
+          invoiceData.clientNiu = clientLegalInfo.niu;
+          invoiceData.clientTaxId = clientLegalInfo.taxId;
+        }
 
         invoices.push(invoiceData);
       }
