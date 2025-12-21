@@ -267,23 +267,24 @@ function generateAmountInWordsBlockCM(amount, lang) {
 }
 
 // ============================================================================
-// USA (US) LEGAL FOOTER - Always in English
+// USA (US) LEGAL FOOTER - Bilingual (FR/EN)
 // ============================================================================
 
 /**
- * Generates US legal footer (minimal requirements)
- * US invoices are typically in English regardless of language setting
+ * Generates US legal footer (minimal requirements) in FR or EN
+ * Genere le footer legal americain en FR ou EN
  * @param {Object} company - Company parameters
  * @param {Object} invoice - Invoice data
- * @param {string} lang - Display language (FR or EN) - mostly ignored for US
+ * @param {string} lang - Display language (FR or EN)
  * @returns {string} US legal footer
  */
 function generateUSLegalFooter(company, invoice, lang) {
   const lines = [];
+  const isEnglish = lang === 'EN';
 
   // Payment terms
-  lines.push('PAYMENT TERMS');
-  const paymentTerms = company.defaultPaymentTerms || 'Payment due upon receipt';
+  lines.push(isEnglish ? 'PAYMENT TERMS' : 'CONDITIONS DE PAIEMENT');
+  const paymentTerms = company.defaultPaymentTerms || (isEnglish ? 'Payment due upon receipt' : 'Paiement à réception');
   const paymentDays = company.defaultPaymentDays || 30;
   lines.push(`${paymentTerms} / Net ${paymentDays}.`);
   lines.push('');
@@ -291,11 +292,16 @@ function generateUSLegalFooter(company, invoice, lang) {
   // Sales tax notice
   const salesTaxRate = company.salesTaxRate || 0;
   if (salesTaxRate > 0) {
-    lines.push(`Sales tax (${salesTaxRate}%) applied where applicable.`);
+    if (isEnglish) {
+      lines.push(`Sales tax (${salesTaxRate}%) applied where applicable.`);
+    } else {
+      lines.push(`Taxe de vente (${salesTaxRate}%) appliquée le cas échéant.`);
+    }
     lines.push('');
   }
 
   // Company information
+  lines.push(isEnglish ? 'LEGAL INFORMATION' : 'INFORMATIONS LÉGALES');
   lines.push(company.name);
 
   // EIN (optional but recommended)
@@ -305,19 +311,27 @@ function generateUSLegalFooter(company, invoice, lang) {
 
   // State Tax ID (if applicable)
   if (company.stateId) {
-    lines.push(`State Tax ID: ${company.stateId}`);
+    if (isEnglish) {
+      lines.push(`State Tax ID: ${company.stateId}`);
+    } else {
+      lines.push(`N° fiscal d'État : ${company.stateId}`);
+    }
   }
 
   lines.push('');
 
   // Contact
   if (company.email) {
-    lines.push(`For questions regarding this invoice: ${company.email}`);
+    if (isEnglish) {
+      lines.push(`For questions regarding this invoice: ${company.email}`);
+    } else {
+      lines.push(`Pour toute question concernant cette facture : ${company.email}`);
+    }
   }
 
   // Thank you message
   lines.push('');
-  lines.push('Thank you for your business.');
+  lines.push(isEnglish ? 'Thank you for your business.' : 'Merci pour votre confiance.');
 
   return lines.join('\n');
 }

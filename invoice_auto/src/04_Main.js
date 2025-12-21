@@ -325,10 +325,19 @@ function menuChangeLanguage() {
   SpreadsheetApp.flush();
 
   if (success) {
-    // Regenerate legal footer in the new language
+    // Regenerate legal footer AND bank details in the new language
     try {
-      generateAndSaveLegalFooterToSettings(null, newLang);
-      logSuccess('menuChangeLanguage', `Legal footer regenerated in ${newLang}`);
+      // Force flush to ensure LOCALE is saved before regenerating
+      SpreadsheetApp.flush();
+
+      // Regenerate both footer and bank details
+      const result = generateAndSaveLegalFooterToSettings(null, newLang);
+
+      if (result.success) {
+        logSuccess('menuChangeLanguage', `Legal footer and bank details regenerated in ${newLang}`);
+      } else {
+        logError('menuChangeLanguage', 'Failed to regenerate footer: ' + result.message);
+      }
     } catch (error) {
       logError('menuChangeLanguage', 'Error regenerating legal footer', error);
       // Continue anyway - footer can be regenerated manually
@@ -337,8 +346,8 @@ function menuChangeLanguage() {
     SpreadsheetApp.flush();
 
     const message = newLang === 'FR'
-      ? 'Langue changée en Français.\nLe footer légal a été régénéré.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
-      : 'Language changed to English.\nLegal footer has been regenerated.\n\nPlease RELOAD the page (F5) to apply changes.';
+      ? 'Langue changée en Français.\nLe footer légal et les coordonnées bancaires ont été régénérés.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
+      : 'Language changed to English.\nLegal footer and bank details have been regenerated.\n\nPlease RELOAD the page (F5) to apply changes.';
 
     const title = newLang === 'FR' ? 'Langue mise à jour' : 'Language Updated';
 
