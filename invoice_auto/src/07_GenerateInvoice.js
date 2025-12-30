@@ -15,13 +15,19 @@
  * Ouvre la fenetre moderne de generation de factures
  */
 function menuGenerateInvoices() {
-  const html = HtmlService.createHtmlOutput(getGenerateInvoiceFormHtml())
-    .setWidth(560)
-    .setHeight(650);
-  const title = getConfiguredLocale() === 'FR' ? 'Generer des factures' : 'Generate Invoices';
-  SpreadsheetApp.getUi().showModalDialog(html, title);
-  // Force UI refresh to remove spinner after dialog closes
-  SpreadsheetApp.flush();
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    const htmlContent = getGenerateInvoiceFormHtml();
+    const html = HtmlService.createHtmlOutput(htmlContent)
+      .setWidth(420)
+      .setHeight(520);
+
+    ui.showModalDialog(html, getConfiguredLocale() === 'FR' ? 'Générer des factures' : 'Generate Invoices');
+  } catch (error) {
+    logError('menuGenerateInvoices', 'Failed to open dialog', error);
+    ui.alert('Error: ' + error.message);
+  }
 }
 
 // ============================================================================
@@ -185,7 +191,7 @@ function getGenerateInvoiceFormHtml() {
   html += '<style>';
   html += ':root{--primary:#059669;--primary-dark:#047857;--primary-light:#d1fae5;--secondary:#8b5cf6;--secondary-light:#f5f3ff;--success:#10b981;--success-light:#d1fae5;--error:#ef4444;--error-light:#fee2e2;--warning:#f59e0b;--warning-light:#fef3c7;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;--gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-800:#1f2937;--gray-900:#111827;--radius:12px}';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:"DM Sans",-apple-system,sans-serif;background:linear-gradient(180deg,var(--gray-50),#fff);color:var(--gray-800);padding:24px;overflow-x:hidden}';
+  html += 'body{font-family:"DM Sans",-apple-system,sans-serif;background:linear-gradient(180deg,var(--gray-50),#fff);color:var(--gray-800);padding:16px;overflow-x:hidden;min-height:100vh}';
   html += '.header{text-align:center;margin-bottom:24px}';
   html += '.header-icon{width:52px;height:52px;background:var(--primary-light);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:float 3s ease-in-out infinite}';
   html += '@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}';
@@ -195,7 +201,7 @@ function getGenerateInvoiceFormHtml() {
   html += '.section{margin-bottom:20px}';
   html += '.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gray-400);margin-bottom:12px;display:flex;align-items:center;gap:8px}';
   html += '.section-title::after{content:"";flex:1;height:1px;background:var(--gray-200)}';
-  html += '.mode-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}';
+  html += '.mode-cards{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:16px}';
   html += '.mode-card{padding:16px;border:2px solid var(--gray-200);border-radius:var(--radius);cursor:pointer;transition:all .2s;background:#fff}';
   html += '.mode-card:hover{border-color:var(--gray-300);background:var(--gray-50)}';
   html += '.mode-card.active{border-color:var(--primary);background:var(--primary-light)}';
@@ -219,7 +225,7 @@ function getGenerateInvoiceFormHtml() {
   html += '.info-card{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-top:10px;display:none;animation:slideDown .25s ease}';
   html += '@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}';
   html += '.info-card.visible{display:block}';
-  html += '.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
+  html += '.info-grid{display:grid;grid-template-columns:1fr;gap:10px}';
   html += '.info-item{display:flex;flex-direction:column;gap:2px}';
   html += '.info-item.full{grid-column:1/-1}';
   html += '.info-label{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase}';
@@ -309,7 +315,7 @@ function getGenerateInvoiceFormHtml() {
 
   // JavaScript
   html += '<script>';
-  html += 'var L={processing:"' + L.processing + '",successSingle:"' + L.successSingle + '",successAll:"' + L.successAll + '",error:"' + L.error + '",viewPdf:"' + L.viewPdf + '",viewDoc:"' + L.viewDoc + '",generated:"' + L.generated + '",failed:"' + L.failed + '",currency:"' + L.currency + '"};';
+  html += 'var L={processing:"' + L.processing + '",successSingle:"' + L.successSingle + '",successAll:"' + L.successAll + '",error:"' + L.error + '",viewPdf:"' + L.viewPdf + '",viewDoc:"' + L.viewDoc + '",generated:"' + L.generated + '",failed:"' + L.failed + '",currency:"' + L.currency + '",btnClose:"' + (lang === 'FR' ? 'Fermer' : 'Close') + '"};';
   html += 'var currentMode="single";';
   html += 'var modeSingle=document.getElementById("modeSingle");var modeAll=document.getElementById("modeAll");';
   html += 'var invoiceSelectSection=document.getElementById("invoiceSelectSection");var invoiceSelect=document.getElementById("invoiceSelect");';
@@ -338,7 +344,8 @@ function getGenerateInvoiceFormHtml() {
   html += 'var msg=L.successAll+" "+r.successful+" "+L.generated;if(r.failed>0){msg+=", "+r.failed+" "+L.failed;}';
   html += 'status.className="status success";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>\'+msg+\'</span>\';';
   html += '}';
-  html += 'setTimeout(function(){google.script.host.close();},3000);';
+  html += 'var btnContainer=document.querySelector(".buttons");';
+  html += 'btnContainer.innerHTML=\'<button type="button" class="btn-primary" onclick="google.script.host.close()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>\'+L.btnClose+\'</button>\';';
   html += '}else{status.className="status error";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+\': \'+r.message+\'</span>\';btn.disabled=false;}';
   html += '}).withFailureHandler(function(err){status.className="status error";status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+\'</span>\';btn.disabled=false;}).processGenerateInvoice(data);});';
 

@@ -592,6 +592,36 @@ function isEmpty(value) {
 }
 
 /**
+ * Initializes the UI context for sidebar display
+ * Forces spreadsheet operations to ensure authorization is complete
+ * This fixes the "first click doesn't open sidebar" bug
+ * @returns {Object} Object containing ss (spreadsheet) and ui references
+ */
+function initSidebarContext() {
+  // IMPORTANT: Get UI reference FIRST before any spreadsheet operations
+  // This ensures the UI context is established early in the execution
+  const ui = SpreadsheetApp.getUi();
+
+  // Now get spreadsheet reference
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Force multiple read operations to ensure authorization is complete
+  ss.getName();
+  const activeSheet = ss.getActiveSheet();
+  if (activeSheet) {
+    activeSheet.getName();
+  }
+
+  // Force flush
+  SpreadsheetApp.flush();
+
+  // Longer delay for first-time authorization (200ms)
+  Utilities.sleep(200);
+
+  return { ss: ss, ui: ui };
+}
+
+/**
  * Forces pending Spreadsheet changes to commit and replaces the default
  * "Working" spinner with a short toast notification. This avoids leaving the
  * Google Sheets UI blocked after long-running scripts.

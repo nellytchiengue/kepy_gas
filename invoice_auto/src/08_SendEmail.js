@@ -15,13 +15,19 @@
  * Ouvre la fenetre moderne d'envoi d'email
  */
 function menuSendEmail() {
-  const html = HtmlService.createHtmlOutput(getSendEmailFormHtml())
-    .setWidth(600)
-    .setHeight(750);
-  const title = getConfiguredLocale() === 'FR' ? 'Envoyer une facture par email' : 'Send Invoice by Email';
-  SpreadsheetApp.getUi().showModalDialog(html, title);
-  // Force UI refresh to remove spinner after dialog closes
-  SpreadsheetApp.flush();
+  const ui = SpreadsheetApp.getUi();
+
+  try {
+    const htmlContent = getSendEmailFormHtml();
+    const html = HtmlService.createHtmlOutput(htmlContent)
+      .setWidth(450)
+      .setHeight(620);
+
+    ui.showModalDialog(html, getConfiguredLocale() === 'FR' ? 'Envoyer par email' : 'Send by Email');
+  } catch (error) {
+    logError('menuSendEmail', 'Failed to open dialog', error);
+    ui.alert('Error: ' + error.message);
+  }
 }
 
 // ============================================================================
@@ -250,7 +256,7 @@ function getSendEmailFormHtml() {
   html += '<style>';
   html += ':root{--primary:#8b5cf6;--primary-dark:#7c3aed;--primary-light:#f5f3ff;--secondary:#059669;--secondary-light:#d1fae5;--success:#10b981;--success-light:#d1fae5;--error:#ef4444;--error-light:#fee2e2;--warning:#f59e0b;--warning-light:#fef3c7;--gray-50:#f9fafb;--gray-100:#f3f4f6;--gray-200:#e5e7eb;--gray-300:#d1d5db;--gray-400:#9ca3af;--gray-500:#6b7280;--gray-600:#4b5563;--gray-700:#374151;--gray-800:#1f2937;--gray-900:#111827;--radius:12px}';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:"DM Sans",-apple-system,sans-serif;background:linear-gradient(180deg,var(--gray-50),#fff);color:var(--gray-800);padding:24px;overflow-x:hidden}';
+  html += 'body{font-family:"DM Sans",-apple-system,sans-serif;background:linear-gradient(180deg,var(--gray-50),#fff);color:var(--gray-800);padding:16px;overflow-x:hidden;min-height:100vh}';
   html += '.header{text-align:center;margin-bottom:24px}';
   html += '.header-icon{width:52px;height:52px;background:var(--primary-light);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;animation:float 3s ease-in-out infinite}';
   html += '@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}';
@@ -270,7 +276,7 @@ function getSendEmailFormHtml() {
   html += '.info-card{background:var(--gray-50);border:1px solid var(--gray-200);border-radius:8px;padding:14px;margin-top:10px;display:none;animation:slideDown .25s ease}';
   html += '@keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}';
   html += '.info-card.visible{display:block}';
-  html += '.info-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}';
+  html += '.info-grid{display:grid;grid-template-columns:1fr;gap:10px}';
   html += '.info-item{display:flex;flex-direction:column;gap:2px}';
   html += '.info-label{font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase}';
   html += '.info-value{font-size:13px;color:var(--gray-700)}';
@@ -301,6 +307,7 @@ function getSendEmailFormHtml() {
   html += '.status.success{display:flex;background:var(--success-light);color:var(--success)}';
   html += '.status.error{display:flex;background:var(--error-light);color:var(--error)}';
   html += '.spinner{width:18px;height:18px;border:2px solid var(--primary-light);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite}';
+  html += '.preview-spinner{width:32px;height:32px;border:3px solid var(--gray-200);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 12px}';
   html += '@keyframes spin{to{transform:rotate(360deg)}}';
   html += '.buttons{display:flex;gap:10px;margin-top:20px}';
   html += 'button{flex:1;padding:12px 20px;font-size:14px;font-weight:600;font-family:inherit;border-radius:var(--radius);cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:8px}';
@@ -347,6 +354,10 @@ function getSendEmailFormHtml() {
   html += '<div id="previewPlaceholder" class="preview-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>';
   html += '<p>' + L.selectFirst + '</p></div>';
 
+  // Loading spinner for preview (shown while loading email preview)
+  html += '<div id="previewLoading" class="preview-placeholder" style="display:none"><div class="preview-spinner"></div>';
+  html += '<p>' + (lang === 'FR' ? 'Chargement de l\'apercu...' : 'Loading preview...') + '</p></div>';
+
   // Email Preview Section (hidden until invoice selected)
   html += '<div class="preview-section" id="previewSection">';
   html += '<div class="section"><div class="section-title">' + L.previewSection + '</div>';
@@ -378,6 +389,7 @@ function getSendEmailFormHtml() {
   html += 'var invoiceSelect=document.getElementById("invoiceSelect");';
   html += 'var invoiceInfo=document.getElementById("invoiceInfo");';
   html += 'var previewPlaceholder=document.getElementById("previewPlaceholder");';
+  html += 'var previewLoading=document.getElementById("previewLoading");';
   html += 'var previewSection=document.getElementById("previewSection");';
   html += 'var emailSubject=document.getElementById("emailSubject");';
   html += 'var emailBody=document.getElementById("emailBody");';
@@ -394,21 +406,31 @@ function getSendEmailFormHtml() {
   html += 'document.getElementById("infoEmail").textContent=s.dataset.email||"-";';
   html += 'document.getElementById("infoAmount").textContent=L.currency+" "+parseFloat(s.dataset.amount||0).toFixed(2);';
   html += 'invoiceInfo.classList.add("visible");';
+  // Show loading spinner while fetching preview
+  html += 'previewPlaceholder.style.display="none";';
+  html += 'previewSection.classList.remove("visible");';
+  html += 'previewLoading.style.display="block";';
   // Load email preview
   html += 'currentInvoiceId=this.value;';
   html += 'google.script.run.withSuccessHandler(function(r){';
+  html += 'previewLoading.style.display="none";';
   html += 'if(r.success){';
   html += 'emailSubject.value=r.subject;';
   html += 'emailBody.value=r.body;';
   html += 'recipientName.textContent=r.recipientName;';
   html += 'recipientEmail.textContent=r.recipientEmail;';
-  html += 'previewPlaceholder.style.display="none";';
   html += 'previewSection.classList.add("visible");';
   html += 'btnSubmit.disabled=false;';
+  html += '}else{';
+  html += 'previewPlaceholder.style.display="block";';
   html += '}';
+  html += '}).withFailureHandler(function(err){';
+  html += 'previewLoading.style.display="none";';
+  html += 'previewPlaceholder.style.display="block";';
   html += '}).getEmailPreview(this.value);';
   html += '}else{';
   html += 'invoiceInfo.classList.remove("visible");';
+  html += 'previewLoading.style.display="none";';
   html += 'previewPlaceholder.style.display="block";';
   html += 'previewSection.classList.remove("visible");';
   html += 'btnSubmit.disabled=true;';
@@ -427,7 +449,6 @@ function getSendEmailFormHtml() {
   html += 'if(r.success){';
   html += 'status.className="status success";';
   html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>\'+L.success+" "+L.sentTo+" "+r.recipientEmail+\'</span>\';';
-  html += 'setTimeout(function(){google.script.host.close();},2500);';
   html += '}else{';
   html += 'status.className="status error";';
   html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+": "+r.message+\'</span>\';';

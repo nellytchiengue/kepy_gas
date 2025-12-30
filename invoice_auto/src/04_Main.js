@@ -14,6 +14,10 @@
  * This function is automatically called by Google Sheets
  */
 function onOpen() {
+  // Ensure UI context is ready
+  SpreadsheetApp.flush();
+
+
   const ui = SpreadsheetApp.getUi();
   const msg = getUIMessages();
   const lang = getConfiguredLocale();
@@ -48,6 +52,14 @@ function onOpen() {
     .addToUi();
 
   Logger.log('Menu created successfully');
+}
+
+/**
+ * Called when the add-on is installed
+ * Required for proper authorization flow on first installation
+ */
+function onInstall(e) {
+  onOpen(e);
 }
 
 // ============================================================================

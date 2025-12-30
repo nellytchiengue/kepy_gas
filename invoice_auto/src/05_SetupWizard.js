@@ -40,8 +40,9 @@ function launchSetupWizard() {
   ui.alert(messages.STEP1_TITLE, messages.STEP1_MESSAGE, ui.ButtonSet.OK);
 
   try {
-    // Template ID from existing Google Docs template
-    // const templateId = '19lus1lxI1eqNUDSdMJ-1yrCRHl87JFYUdGJ1aNVBUNA';
+    // Template ID will be collected during setup or use default
+    // User can update this in Settings sheet after setup
+    var templateId = '';
 
     // Step 2: Auto-detect Drive folder / Détecter automatiquement le dossier Driveæ
     SpreadsheetApp.flush(); // Force UI refresh before alert
