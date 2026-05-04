@@ -751,7 +751,7 @@ function autoConfigureSettings(templateId, folderId, companyInfo) {
     configData.push([INVOICE_CONFIG.PARAM_KEYS.BANK_DETAILS_CUSTOM, '']);
 
     // Folder organization - parent folder for all client documents
-    configData.push([INVOICE_CONFIG.PARAM_KEYS.DOCUMENTS_FOLDER_NAME, 'DOCUMENTS']);
+    configData.push([INVOICE_CONFIG.PARAM_KEYS.CLIENTS_FOLDER_NAME, 'CLIENTS']);
 
     // Write all data to sheet
     settingsSheet.getRange(2, 1, configData.length, 2).setValues(configData);

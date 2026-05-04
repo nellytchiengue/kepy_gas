@@ -1,16 +1,18 @@
-# 📄 Invoice Auto - Système de Génération Automatique de Factures
+# 📄 InvoiceFlash - Facturation Automatique Google Sheets
 
-Système complet et autonome de génération automatique de factures PDF à partir d'un Google Sheet, utilisant Google Apps Script.
+Système complet de facturation automatisée fonctionnant 100% dans Google Workspace (Sheets, Docs, Drive, Gmail). Conçu pour les freelances, auto-entrepreneurs et petites entreprises.
 
 ## 🎯 Fonctionnalités
 
 - ✨ **Génération automatique** : Transforme vos données Sheet en factures PDF professionnelles
-- 📧 **Envoi par email** : Option d'envoi automatique ou manuel des factures aux clients
-- 📊 **Suivi des statuts** : Brouillon → Générée → Envoyée
+- 📧 **Envoi par email** : Envoi direct depuis Gmail avec pièce jointe PDF
+- 📊 **Suivi des statuts** : Draft → Generated → Sent
 - 🔐 **Validation des données** : Vérification de cohérence des informations
-- 📈 **Statistiques** : Vue d'ensemble de vos factures
+- 📈 **Statistiques** : Tableau de bord avec vue d'ensemble
 - 🎨 **Personnalisable** : Template Google Docs entièrement modifiable
-- 🌍 **Multi-langue** : Montants en lettres (français)
+- 🌍 **Multi-pays** : France, Cameroun, USA avec conformité légale
+- 🇫🇷🇬🇧 **Bilingue** : Interface Français/Anglais
+- ⚡ **Performance optimisée** : Cache intelligent pour exécution rapide
 
 ---
 
@@ -271,14 +273,22 @@ invoice_auto/
 
 Une fois les scripts installés, le menu **📄 Factures** apparaît dans votre Google Sheet :
 
+### Workflow principal (3 étapes)
+
+| Option (FR)                          | Option (EN)                | Description                                    |
+|--------------------------------------|----------------------------|------------------------------------------------|
+| 1️⃣ ➕ Enregistrement d'une vente    | 1️⃣ ➕ Record a sale       | Crée une nouvelle facture (brouillon)          |
+| 2️⃣ 📄 Génération de facture(s)      | 2️⃣ 📄 Generate invoice(s) | Génère les PDF des factures en attente         |
+| 3️⃣ 📧 Envoi de mail(s)              | 3️⃣ 📧 Send email(s)       | Envoie les factures par email                  |
+
+### Autres options
+
 | Option                           | Description                                    |
 |----------------------------------|------------------------------------------------|
-| ✨ Générer toutes les factures   | Génère toutes les factures avec statut "Brouillon" |
-| 🔍 Générer une facture spécifique | Génère une facture par son ID              |
-| 📧 Envoyer une facture par email  | Envoie manuellement une facture déjà générée |
-| 📊 Voir les statistiques          | Affiche le nombre de factures par statut   |
-| ⚙️ Tester les permissions         | Vérifie que tout est correctement configuré |
-| ℹ️ À propos                       | Informations sur le système                |
+| 📊 Statistiques                  | Tableau de bord avec vue d'ensemble            |
+| 🌐 Changer de langue             | Bascule entre Français et English              |
+| ⚙️ Tester les permissions        | Vérifie que tout est correctement configuré    |
+| 📝 Régénérer footer légal        | Met à jour le pied de page légal               |
 
 ---
 
@@ -286,14 +296,24 @@ Une fois les scripts installés, le menu **📄 Factures** apparaît dans votre 
 
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│  Brouillon  │ ──▶  │  Générée    │ ──▶  │   Envoyée   │
+│    Draft    │ ──▶  │  Generated  │ ──▶  │    Sent     │
 └─────────────┘      └─────────────┘      └─────────────┘
-     (Création)         (Génération)         (Email envoyé)
+   (Création)         (Génération)         (Email envoyé)
 ```
 
-1. **Brouillon** : Facture créée dans le Sheet, en attente de génération
-2. **Générée** : Facture transformée en PDF et stockée dans Drive
-3. **Envoyée** : Facture envoyée par email au client
+1. **Draft** : Facture créée dans le Sheet, en attente de génération
+2. **Generated** : Facture transformée en PDF et stockée dans Drive
+3. **Sent** : Facture envoyée par email au client
+
+### Organisation des fichiers
+
+```
+📁 [Votre dossier principal]
+└── 📁 CLIENTS
+    └── 📁 [Nom du client]
+        ├── 📄 Facture_INV2025-001_ClientABC.pdf
+        └── 📄 Facture_INV2025-002_ClientABC.pdf
+```
 
 ---
 
@@ -346,8 +366,8 @@ Ce projet est libre d'utilisation pour un usage personnel et commercial.
 ## 👨‍💻 Auteur
 
 Développé par Claude Code pour Nelly Tchiengue
-Version 1.0 - Décembre 2025
+Version 2.0 Multi-Country Edition - Mai 2026
 
 ---
 
-**Bon usage du système de génération automatique de factures !** 🚀
+**Bon usage de InvoiceFlash !** 🚀

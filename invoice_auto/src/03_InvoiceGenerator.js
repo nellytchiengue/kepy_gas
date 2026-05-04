@@ -11,67 +11,67 @@
 // ============================================================================
 
 /**
- * Gets or creates the DOCUMENTS parent folder in the root folder
- * Récupère ou crée le dossier parent DOCUMENTS dans le dossier racine
+ * Gets or creates the CLIENTS parent folder in the root folder
+ * Récupère ou crée le dossier parent CLIENTS dans le dossier racine
  * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder from Settings
- * @returns {GoogleAppsScript.Drive.Folder} The DOCUMENTS folder
+ * @returns {GoogleAppsScript.Drive.Folder} The CLIENTS folder
  */
-function getOrCreateDocumentsFolder(rootFolder) {
+function getOrCreateClientsFolder(rootFolder) {
   try {
-    // Get folder name from settings, default to "DOCUMENTS"
-    const folderName = getParam(INVOICE_CONFIG.PARAM_KEYS.DOCUMENTS_FOLDER_NAME) || 'DOCUMENTS';
+    // Get folder name from settings, default to "CLIENTS"
+    const folderName = getParam(INVOICE_CONFIG.PARAM_KEYS.CLIENTS_FOLDER_NAME) || 'CLIENTS';
 
-    // Search for existing DOCUMENTS folder
+    // Search for existing CLIENTS folder
     const existingFolders = rootFolder.getFoldersByName(folderName);
 
     if (existingFolders.hasNext()) {
       const folder = existingFolders.next();
-      logSuccess('getOrCreateDocumentsFolder', `Using existing folder: ${folderName}`);
+      logSuccess('getOrCreateClientsFolder', `Using existing folder: ${folderName}`);
       return folder;
     }
 
-    // Create new DOCUMENTS folder if doesn't exist
+    // Create new CLIENTS folder if doesn't exist
     const newFolder = rootFolder.createFolder(folderName);
-    logSuccess('getOrCreateDocumentsFolder', `Created new folder: ${folderName}`);
+    logSuccess('getOrCreateClientsFolder', `Created new folder: ${folderName}`);
     return newFolder;
 
   } catch (error) {
-    logError('getOrCreateDocumentsFolder', 'Error creating DOCUMENTS folder', error);
+    logError('getOrCreateClientsFolder', 'Error creating CLIENTS folder', error);
     // Fallback: return root folder if creation fails
     return rootFolder;
   }
 }
 
 /**
- * Gets or creates a subfolder for a client inside the DOCUMENTS folder
- * Récupère ou crée un sous-dossier pour un client dans le dossier DOCUMENTS
+ * Gets or creates a subfolder for a client inside the CLIENTS folder
+ * Récupère ou crée un sous-dossier pour un client dans le dossier CLIENTS
  *
- * Structure: ROOT_FOLDER → DOCUMENTS → [Client Name] → invoices
+ * Structure: ROOT_FOLDER → CLIENTS → [Client Name] → invoices
  *
  * @param {GoogleAppsScript.Drive.Folder} rootFolder - The root folder from Settings
  * @param {string} clientName - The client name
- * @returns {GoogleAppsScript.Drive.Folder} The client folder inside DOCUMENTS
+ * @returns {GoogleAppsScript.Drive.Folder} The client folder inside CLIENTS
  */
 function getOrCreateClientFolder(rootFolder, clientName) {
   try {
-    // First, get or create the DOCUMENTS parent folder
-    const documentsFolder = getOrCreateDocumentsFolder(rootFolder);
+    // First, get or create the CLIENTS parent folder
+    const clientsFolder = getOrCreateClientsFolder(rootFolder);
 
     // Clean client name to make it folder-safe
     const safeFolderName = cleanString(clientName).replace(/[^a-z0-9\s\-_]/gi, '_');
 
-    // Search for existing client folder inside DOCUMENTS
-    const existingFolders = documentsFolder.getFoldersByName(safeFolderName);
+    // Search for existing client folder inside CLIENTS
+    const existingFolders = clientsFolder.getFoldersByName(safeFolderName);
 
     if (existingFolders.hasNext()) {
       const folder = existingFolders.next();
-      logSuccess('getOrCreateClientFolder', `Using existing folder: DOCUMENTS/${safeFolderName}`);
+      logSuccess('getOrCreateClientFolder', `Using existing folder: CLIENTS/${safeFolderName}`);
       return folder;
     }
 
-    // Create new client folder inside DOCUMENTS if doesn't exist
-    const newFolder = documentsFolder.createFolder(safeFolderName);
-    logSuccess('getOrCreateClientFolder', `Created new folder: DOCUMENTS/${safeFolderName}`);
+    // Create new client folder inside CLIENTS if doesn't exist
+    const newFolder = clientsFolder.createFolder(safeFolderName);
+    logSuccess('getOrCreateClientFolder', `Created new folder: CLIENTS/${safeFolderName}`);
     return newFolder;
 
   } catch (error) {
@@ -84,6 +84,108 @@ function getOrCreateClientFolder(rootFolder, clientName) {
 // ============================================================================
 // INDIVIDUAL INVOICE GENERATION
 // ============================================================================
+
+/**
+ * Generates an invoice with transaction-like behavior and rollback on failure
+ * If any step fails, cleans up partial artifacts (temp docs, PDFs)
+ * Status is only updated AFTER successful PDF creation
+ *
+ * @param {string} invoiceId - The invoice ID to generate
+ * @returns {Object} {success: boolean, pdfUrl?: string, docUrl?: string, error?: string}
+ */
+function generateInvoiceSafe(invoiceId) {
+  var tempDocFile = null;
+  var pdfFile = null;
+  var artifacts = []; // Track created artifacts for cleanup on failure
+
+  try {
+    // 1. DATA RETRIEVAL
+    var invoiceData = getInvoiceDataById(invoiceId);
+    if (!invoiceData) {
+      return { success: false, error: 'Invoice ' + invoiceId + ' not found' };
+    }
+
+    // 2. DATA VALIDATION
+    var validation = validateInvoiceData(invoiceData);
+    if (!validation.isValid) {
+      return { success: false, error: 'Invalid data: ' + validation.errors.join(', ') };
+    }
+
+    // 3. RETRIEVE PARAMETERS
+    var templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
+    var folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID);
+    var companyParams = getCompanyParams();
+
+    if (!templateId || !folderId) {
+      return { success: false, error: 'Missing configuration: TEMPLATE_DOCS_ID or DRIVE_FOLDER_ID' };
+    }
+
+    // 4. GET OR CREATE CLIENT SUBFOLDER
+    var rootFolder = DriveApp.getFolderById(folderId);
+    var clientFolder = getOrCreateClientFolder(rootFolder, invoiceData.clientName);
+
+    // 5. CREATE DOCUMENT FROM TEMPLATE
+    var templateFile = DriveApp.getFileById(templateId);
+    var fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientName);
+    tempDocFile = templateFile.makeCopy('TEMP_' + invoiceId + '_' + Date.now(), clientFolder);
+    artifacts.push({ type: 'tempDoc', file: tempDocFile });
+
+    // 6. FILL PLACEHOLDERS
+    var doc = DocumentApp.openById(tempDocFile.getId());
+    replaceMarkers(doc.getBody(), invoiceData, companyParams);
+    doc.saveAndClose();
+
+    // 7. GENERATE PDF
+    var pdfBlob = tempDocFile.getAs('application/pdf').setName(fileName + '.pdf');
+    pdfFile = clientFolder.createFile(pdfBlob);
+    artifacts.push({ type: 'pdf', file: pdfFile });
+
+    var pdfUrl = pdfFile.getUrl();
+
+    // 8. RENAME TEMP DOC TO FINAL NAME (keep as editable version)
+    tempDocFile.setName(fileName);
+    var docUrl = tempDocFile.getUrl();
+
+    // 9. UPDATE STATUS - Only after successful PDF creation
+    var updated = markInvoiceAsGenerated(invoiceData.invoiceId, pdfUrl);
+    if (!updated) {
+      throw new Error('Failed to update invoice status');
+    }
+
+    // 10. AUTO-SEND EMAIL IF ENABLED
+    var autoSendEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.AUTO_SEND_EMAIL);
+    if (autoSendEmail === 'true' || autoSendEmail === true) {
+      sendInvoiceEmail(invoiceData, pdfFile, companyParams);
+    }
+
+    logSuccess('generateInvoiceSafe', 'Invoice ' + invoiceId + ' generated successfully');
+
+    return {
+      success: true,
+      pdfUrl: pdfUrl,
+      docUrl: docUrl
+    };
+
+  } catch (error) {
+    // ROLLBACK: Clean up all artifacts on failure
+    logError('generateInvoiceSafe', 'Failed to generate ' + invoiceId + ', rolling back', error);
+
+    for (var i = 0; i < artifacts.length; i++) {
+      try {
+        artifacts[i].file.setTrashed(true);
+        logError('generateInvoiceSafe', 'Rollback: deleted ' + artifacts[i].type);
+      } catch (cleanupError) {
+        // Ignore cleanup errors, log only
+        logError('generateInvoiceSafe', 'Rollback cleanup failed for ' + artifacts[i].type, cleanupError);
+      }
+    }
+
+    return {
+      success: false,
+      error: error.message || String(error)
+    };
+  }
+}
 
 /**
  * Generates Google Doc and PDF invoice files for a given ID

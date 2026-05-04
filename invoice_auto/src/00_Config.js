@@ -180,7 +180,7 @@ const INVOICE_CONFIG = {
     USE_CUSTOM_FOOTER: 'USE_CUSTOM_FOOTER',         // true = use custom, false = auto-generate
 
     // Folder Organization / Organisation des Dossiers
-    DOCUMENTS_FOLDER_NAME: 'DOCUMENTS_FOLDER_NAME'  // Parent folder name for all client docs (default: DOCUMENTS)
+    CLIENTS_FOLDER_NAME: 'CLIENTS_FOLDER_NAME'  // Parent folder name for all client docs (default: CLIENTS)
   },
 
   // ---------------------------------------------------------------------------

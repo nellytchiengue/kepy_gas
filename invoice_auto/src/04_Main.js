@@ -14,19 +14,18 @@
  * This function is automatically called by Google Sheets
  */
 function onOpen() {
-  // Ensure UI context is ready
-  SpreadsheetApp.flush();
-
-
   const ui = SpreadsheetApp.getUi();
   const msg = getUIMessages();
   const lang = getConfiguredLocale();
 
-  // Label pour l'ajout de facture
-  const newInvoiceLabel = lang === 'FR' ? '➕ Nouvelle facture' : '➕ New Invoice';
+  // Label pour l'enregistrement d'une vente (étape 1)
+  const newSaleLabel = lang === 'FR' ? '➕ Enregistrement d\'une vente' : '➕ Record a sale';
 
-  // Label pour la génération de factures
-  const generateLabel = lang === 'FR' ? '📄 Générer des factures' : '📄 Generate Invoices';
+  // Label pour la génération de factures (étape 2)
+  const generateLabel = lang === 'FR' ? '📄 Génération de facture(s)' : '📄 Generate invoice(s)';
+
+  // Label pour l'envoi de mails (étape 3)
+  const sendEmailLabel = lang === 'FR' ? '📧 Envoi de mail(s)' : '📧 Send email(s)';
 
   // Label pour changer de langue (affiche l'autre langue disponible)
   const changeLangLabel = lang === 'FR' ? '🌐 Switch to English' : '🌐 Passer en Français';
@@ -35,11 +34,11 @@ function onOpen() {
   const regenerateFooterLabel = lang === 'FR' ? '📝 Régénérer footer légal' : '📝 Regenerate Legal Footer';
 
   ui.createMenu(msg.MENU_TITLE)
-    .addItem('1️⃣ - ' + newInvoiceLabel, 'menuAddNewInvoice')
+    .addItem('1️⃣ - ' + newSaleLabel, 'menuAddNewInvoice')
     .addSeparator()
     .addItem('2️⃣ - ' + generateLabel, 'menuGenerateInvoices')
     .addSeparator()
-    .addItem('3️⃣ - ' + msg.MENU_SEND_EMAIL, 'menuSendEmail')
+    .addItem('3️⃣ - ' + sendEmailLabel, 'menuSendEmail')
     .addSeparator()
     .addItem(msg.MENU_STATISTICS, 'menuStatistics')
     .addSeparator()
@@ -63,52 +62,158 @@ function onInstall(e) {
 }
 
 // ============================================================================
+// BATCH PROCESSING CONFIGURATION
+// ============================================================================
+
+/**
+ * Batch processing limits to stay within GAS execution limits
+ * - 6 min execution limit / ~5s per invoice = ~70 invoices max
+ * - Add small delay between invoices to avoid quota errors
+ */
+var BATCH_CONFIG = {
+  MAX_INVOICES_PER_RUN: 50,
+  DELAY_BETWEEN_INVOICES_MS: 100
+};
+
+/**
+ * Processes invoices in controlled batches with detailed error tracking
+ * Uses generateInvoiceSafe for transactional generation with rollback
+ *
+ * @param {Array} invoices - Array of invoice data objects
+ * @returns {Object} {success: number, failed: Array, remaining: number, details: Array}
+ */
+function processBatchInvoices(invoices) {
+  var results = {
+    success: 0,
+    failed: [],
+    remaining: 0,
+    details: []
+  };
+
+  // Limit to max per run
+  var toProcess = invoices.slice(0, BATCH_CONFIG.MAX_INVOICES_PER_RUN);
+  results.remaining = Math.max(0, invoices.length - BATCH_CONFIG.MAX_INVOICES_PER_RUN);
+
+  for (var i = 0; i < toProcess.length; i++) {
+    var invoice = toProcess[i];
+
+    try {
+      // Use safe generation with rollback
+      var result = generateInvoiceSafe(invoice.invoiceId);
+
+      if (result.success) {
+        results.success++;
+        results.details.push({
+          invoiceId: invoice.invoiceId,
+          success: true,
+          message: 'OK',
+          url: result.pdfUrl
+        });
+      } else {
+        results.failed.push({
+          invoiceId: invoice.invoiceId,
+          error: result.error
+        });
+        results.details.push({
+          invoiceId: invoice.invoiceId,
+          success: false,
+          message: result.error,
+          url: null
+        });
+      }
+
+      // Pause between each generation to avoid quota errors
+      if (BATCH_CONFIG.DELAY_BETWEEN_INVOICES_MS > 0 && i < toProcess.length - 1) {
+        Utilities.sleep(BATCH_CONFIG.DELAY_BETWEEN_INVOICES_MS);
+      }
+
+    } catch (error) {
+      results.failed.push({
+        invoiceId: invoice.invoiceId,
+        error: error.message || String(error)
+      });
+      results.details.push({
+        invoiceId: invoice.invoiceId,
+        success: false,
+        message: error.message || String(error),
+        url: null
+      });
+      logError('processBatchInvoices', 'Unexpected error for ' + invoice.invoiceId, error);
+    }
+  }
+
+  return results;
+}
+
+// ============================================================================
 // MENU FUNCTIONS - INVOICE GENERATION
 // ============================================================================
 
 /**
- * Menu: Generates all invoices with status "Draft"
+ * Menu: Generates all invoices with status "Draft" using batch processing
+ * Shows detailed results including failures
+ * Limits processing to BATCH_CONFIG.MAX_INVOICES_PER_RUN per execution
  */
 function menuGenerateAllInvoices() {
   const ui = SpreadsheetApp.getUi();
   const msg = getUIMessages();
+  const lang = getConfiguredLocale();
+
+  // Get pending invoices first to show count in confirmation
+  const pendingInvoices = getPendingInvoices();
+
+  if (pendingInvoices.length === 0) {
+    ui.alert(msg.INFO_TITLE, msg.NO_PENDING_INVOICES || 'No pending invoices to generate.', ui.ButtonSet.OK);
+    return;
+  }
+
+  // Build confirmation message with batch limit warning
+  var confirmMsg = msg.GENERATE_ALL_CONFIRM || 'Generate all draft invoices?';
+  if (pendingInvoices.length > BATCH_CONFIG.MAX_INVOICES_PER_RUN) {
+    var batchWarning = lang === 'FR'
+      ? '\n\n⚠️ ' + pendingInvoices.length + ' factures trouvées. Seules les ' + BATCH_CONFIG.MAX_INVOICES_PER_RUN + ' premières seront traitées.\nRelancez l\'opération pour traiter les suivantes.'
+      : '\n\n⚠️ ' + pendingInvoices.length + ' invoices found. Only the first ' + BATCH_CONFIG.MAX_INVOICES_PER_RUN + ' will be processed.\nRun again to process remaining.';
+    confirmMsg += batchWarning;
+  }
 
   // Confirmation before generation
   const response = ui.alert(
     msg.GENERATE_ALL_TITLE,
-    msg.GENERATE_ALL_CONFIRM,
+    confirmMsg,
     ui.ButtonSet.YES_NO
   );
 
   if (response !== ui.Button.YES) {
-    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
 
-  // Generate all invoices (processing starts immediately)
-  const result = generateAllPendingInvoices();
+  // Process invoices in batch with safe generation
+  const result = processBatchInvoices(pendingInvoices);
 
-  // Display result - flush to clear spinner before showing alert
-  SpreadsheetApp.flush();
+  // Build detailed result message
+  var summaryMsg = lang === 'FR'
+    ? '✅ Succès: ' + result.success + '\n❌ Échecs: ' + result.failed.length
+    : '✅ Success: ' + result.success + '\n❌ Failed: ' + result.failed.length;
 
-  if (result.totalProcessed === 0) {
-    ui.alert(msg.INFO_TITLE, result.message, ui.ButtonSet.OK);
-  } else {
-    const details = result.details
-      .map(d => `${d.invoiceId}: ${d.success ? '✅' : '❌'} ${d.message}`)
-      .join('\n');
-
-    ui.alert(
-      msg.RESULT_TITLE,
-      `${result.message}\n\n${msg.DETAILS_LABEL}\n${details}`,
-      ui.ButtonSet.OK
-    );
+  if (result.remaining > 0) {
+    summaryMsg += lang === 'FR'
+      ? '\n⏳ Restantes: ' + result.remaining + ' (relancer pour continuer)'
+      : '\n⏳ Remaining: ' + result.remaining + ' (run again to continue)';
   }
 
-  // Final flush after alert to ensure spinner is dismissed
-  SpreadsheetApp.flush();
-  return;
+  // Add failure details if any
+  if (result.failed.length > 0) {
+    summaryMsg += '\n\n' + (lang === 'FR' ? 'Détails des échecs:' : 'Failure details:');
+    for (var i = 0; i < Math.min(result.failed.length, 10); i++) {
+      summaryMsg += '\n• ' + result.failed[i].invoiceId + ': ' + result.failed[i].error;
+    }
+    if (result.failed.length > 10) {
+      summaryMsg += '\n... ' + (lang === 'FR' ? 'et ' : 'and ') + (result.failed.length - 10) + (lang === 'FR' ? ' autres' : ' more');
+    }
+  }
+
+  ui.alert(msg.RESULT_TITLE, summaryMsg, ui.ButtonSet.OK);
 }
 
 /**
@@ -126,7 +231,6 @@ function menuGenerateSingleInvoice() {
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
@@ -134,16 +238,12 @@ function menuGenerateSingleInvoice() {
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
-    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
 
-  // Generate invoice (processing starts immediately)
+  // Generate invoice
   const result = generateInvoiceById(invoiceId);
-
-  // Display result - flush to clear spinner before showing alert
-  SpreadsheetApp.flush();
 
   if (result.success) {
     ui.alert(
@@ -154,10 +254,6 @@ function menuGenerateSingleInvoice() {
   } else {
     ui.alert(msg.ERROR_TITLE, result.message, ui.ButtonSet.OK);
   }
-
-  // Final flush after alert to ensure spinner is dismissed
-  SpreadsheetApp.flush();
-  return;
 }
 
 // ============================================================================
@@ -179,7 +275,6 @@ function menuSendInvoiceEmail() {
   );
 
   if (response.getSelectedButton() !== ui.Button.OK) {
-    SpreadsheetApp.flush();
     ui.alert(msg.OPERATION_CANCELLED);
     return;
   }
@@ -187,25 +282,18 @@ function menuSendInvoiceEmail() {
   const invoiceId = response.getResponseText().trim();
 
   if (!invoiceId) {
-    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, msg.INVOICE_ID_MISSING, ui.ButtonSet.OK);
     return;
   }
 
-  // Send email (processing starts immediately)
+  // Send email
   const result = sendInvoiceEmailManually(invoiceId);
 
-  // Display result - flush to clear spinner before showing alert
-  SpreadsheetApp.flush();
   ui.alert(
     result.success ? msg.SUCCESS_TITLE : msg.ERROR_TITLE,
     result.message,
     ui.ButtonSet.OK
   );
-
-  // Final flush after alert to ensure spinner is dismissed
-  SpreadsheetApp.flush();
-  return;
 }
 
 // ============================================================================
@@ -220,9 +308,6 @@ function menuShowStatistics() {
   const msg = getUIMessages();
 
   const stats = getInvoiceStatistics();
-
-  // Flush to clear spinner before showing alert
-  SpreadsheetApp.flush();
 
   if (!stats) {
     ui.alert(msg.ERROR_TITLE, msg.STATS_ERROR, ui.ButtonSet.OK);
@@ -241,10 +326,6 @@ ${msg.STATS_BY_STATUS}
   `;
 
   ui.alert(msg.MENU_STATISTICS, message, ui.ButtonSet.OK);
-
-  // Final flush after alert to ensure spinner is dismissed
-  SpreadsheetApp.flush();
-  return;
 }
 
 // ============================================================================
@@ -259,8 +340,6 @@ function menuTestPermissions() {
   const msg = getUIMessages();
 
   try {
-    // Show initial info dialog
-    SpreadsheetApp.flush();
     ui.alert(msg.TEST_IN_PROGRESS, msg.TEST_VERIFYING, ui.ButtonSet.OK);
 
     const results = testAllPermissions();
@@ -272,19 +351,11 @@ ${msg.DETAILS_LABEL}
 ${results.details.map(d => `${d.test}: ${d.success ? '✅' : '❌'} ${d.message}`).join('\n')}
     `;
 
-    // Flush to clear spinner before showing alert
-    SpreadsheetApp.flush();
     ui.alert(msg.TEST_TITLE, message, ui.ButtonSet.OK);
 
-    // Final flush after alert to ensure spinner is dismissed
-    SpreadsheetApp.flush();
-
   } catch (error) {
-    SpreadsheetApp.flush();
     ui.alert(msg.ERROR_TITLE, `${msg.TEST_ERROR}: ${error.message}`, ui.ButtonSet.OK);
-    SpreadsheetApp.flush();
   }
-  return;
 }
 
 /**
@@ -309,13 +380,7 @@ ${msg.ABOUT_FEATURES}
 ${msg.ABOUT_README}
   `;
 
-  // Flush to clear spinner before showing alert
-  SpreadsheetApp.flush();
   ui.alert(msg.ABOUT_TITLE, message, ui.ButtonSet.OK);
-
-  // Final flush after alert to ensure spinner is dismissed
-  SpreadsheetApp.flush();
-  return;
 }
 
 // ============================================================================
@@ -334,15 +399,9 @@ function menuChangeLanguage() {
   // Update LOCALE in Settings sheet
   const success = updateSettingsParam('LOCALE', newLang);
 
-  SpreadsheetApp.flush();
-
   if (success) {
     // Regenerate legal footer AND bank details in the new language
     try {
-      // Force flush to ensure LOCALE is saved before regenerating
-      SpreadsheetApp.flush();
-
-      // Regenerate both footer and bank details
       const result = generateAndSaveLegalFooterToSettings(null, newLang);
 
       if (result.success) {
@@ -352,10 +411,7 @@ function menuChangeLanguage() {
       }
     } catch (error) {
       logError('menuChangeLanguage', 'Error regenerating legal footer', error);
-      // Continue anyway - footer can be regenerated manually
     }
-
-    SpreadsheetApp.flush();
 
     const message = newLang === 'FR'
       ? 'Langue changée en Français.\nLe footer légal et les coordonnées bancaires ont été régénérés.\n\nVeuillez RECHARGER la page (F5) pour appliquer les changements.'
@@ -371,9 +427,6 @@ function menuChangeLanguage() {
 
     ui.alert('Error', errorMsg, ui.ButtonSet.OK);
   }
-
-  SpreadsheetApp.flush();
-  return;
 }
 
 /**
@@ -399,6 +452,7 @@ function updateSettingsParam(key, value) {
       if (String(data[i][0]).trim() === key) {
         // Update the value in column B
         settingsSheet.getRange(i + 1, 2).setValue(value);
+        clearSettingsCache(); // Clear cache after update
         logSuccess('updateSettingsParam', `${key} updated to ${value}`);
         return true;
       }
@@ -406,6 +460,7 @@ function updateSettingsParam(key, value) {
 
     // Key not found, add it at the end
     settingsSheet.appendRow([key, value]);
+    clearSettingsCache(); // Clear cache after update
     logSuccess('updateSettingsParam', `${key} added with value ${value}`);
     return true;
 
@@ -579,12 +634,7 @@ function scheduledInvoiceGeneration() {
 
     logSuccess('scheduledInvoiceGeneration', `Génération terminée : ${result.message}`);
 
-    // Force UI refresh
-    SpreadsheetApp.flush();
-
   } catch (error) {
     logError('scheduledInvoiceGeneration', 'Erreur lors de la génération planifiée', error);
-    // Force UI refresh even on error
-    SpreadsheetApp.flush();
   }
 }

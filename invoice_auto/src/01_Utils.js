@@ -11,93 +11,140 @@
 // ============================================================================
 
 /**
- * Retrieves a parameter from the "Settings" sheet
- * Récupère un paramètre depuis la feuille "Settings"
- * @param {string} key - The parameter key / La clé du paramètre
- * @returns {string|null} Parameter value or null if not found
+ * Cache for Settings parameters - avoids multiple reads of the same sheet
+ * Cache pour les paramètres Settings - évite les lectures multiples
  */
-function getParam(key) {
+var _settingsCache = null;
+var _settingsCacheTimestamp = 0;
+var SETTINGS_CACHE_TTL_MS = 30000; // Cache valid for 30 seconds
+
+/**
+ * Loads all Settings into cache (single read)
+ * Charge tous les Settings en cache (une seule lecture)
+ * @returns {Object} Map of key -> value
+ */
+function loadSettingsCache() {
+  const now = Date.now();
+
+  // Return cache if still valid
+  if (_settingsCache && (now - _settingsCacheTimestamp) < SETTINGS_CACHE_TTL_MS) {
+    return _settingsCache;
+  }
+
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const settingsSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.SETTINGS);
 
     if (!settingsSheet) {
-      Logger.log('Error: Settings sheet not found / Erreur: Feuille Settings introuvable');
-      return null;
+      Logger.log('Error: Settings sheet not found');
+      return {};
     }
 
     const data = settingsSheet.getDataRange().getValues();
+    _settingsCache = {};
 
-    // Loop through rows to find the key (column A)
     for (let i = 0; i < data.length; i++) {
-      if (String(data[i][0]).trim() === key) {
-        return data[i][1]; // Return value in column B
+      const key = String(data[i][0]).trim();
+      if (key) {
+        _settingsCache[key] = data[i][1];
       }
     }
 
-    Logger.log(`Parameter ${key} not found in Settings sheet / Paramètre ${key} non trouvé`);
-    return null;
+    _settingsCacheTimestamp = now;
+    return _settingsCache;
 
   } catch (error) {
-    Logger.log(`Error retrieving parameter ${key}: ${error}`);
-    return null;
+    Logger.log('Error loading settings cache: ' + error);
+    return {};
   }
 }
 
 /**
+ * Clears the Settings cache (call after updating Settings)
+ * Vide le cache des Settings (appeler après mise à jour)
+ */
+function clearSettingsCache() {
+  _settingsCache = null;
+  _settingsCacheTimestamp = 0;
+}
+
+/**
+ * Retrieves a parameter from the "Settings" sheet (uses cache)
+ * Récupère un paramètre depuis la feuille "Settings" (utilise le cache)
+ * @param {string} key - The parameter key / La clé du paramètre
+ * @returns {string|null} Parameter value or null if not found
+ */
+function getParam(key) {
+  const cache = loadSettingsCache();
+  const value = cache[key];
+  return value !== undefined ? value : null;
+}
+
+/**
  * Retrieves all company parameters including legal IDs based on country
+ * Uses cache for optimal performance (single sheet read)
  * Recupere tous les parametres de l'entreprise incluant les identifiants legaux selon le pays
  * @returns {Object} Object containing all company info
  */
 function getCompanyParams() {
-  const country = getParam(INVOICE_CONFIG.PARAM_KEYS.COUNTRY) || 'FR';
+  // Load cache once (single sheet read)
+  const cache = loadSettingsCache();
+  const keys = INVOICE_CONFIG.PARAM_KEYS;
 
-  // Basic company info (all countries)
+  // Helper to get value from cache with default
+  const get = (key, defaultVal) => {
+    const val = cache[key];
+    return val !== undefined && val !== null && val !== '' ? val : defaultVal;
+  };
+
+  const country = get(keys.COUNTRY, 'FR');
+
+  // Build params object from cache (no additional sheet reads)
   const params = {
     // Country
     country: country,
 
     // Basic Info
-    name: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_NAME) || 'Company Name',
-    address: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_ADDRESS) || 'Address not provided',
-    phone: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_PHONE) || '',
-    email: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_EMAIL) || '',
-    website: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_WEBSITE) || '',
-    logoUrl: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_LOGO_URL) || '',
+    name: get(keys.COMPANY_NAME, 'Company Name'),
+    address: get(keys.COMPANY_ADDRESS, 'Address not provided'),
+    phone: get(keys.COMPANY_PHONE, ''),
+    email: get(keys.COMPANY_EMAIL, ''),
+    website: get(keys.COMPANY_WEBSITE, ''),
+    logoUrl: get(keys.COMPANY_LOGO_URL, ''),
 
     // France (FR) Legal IDs
-    siret: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_SIRET) || '',
-    siren: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_SIREN) || '',
-    vatFR: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_VAT_FR) || '',
-    rcs: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCS) || '',
-    capital: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_CAPITAL) || '',
-    legalForm: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_LEGAL_FORM) || '',
-    apeCode: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_APE_CODE) || '',
-    isAutoEntrepreneur: String(getParam(INVOICE_CONFIG.PARAM_KEYS.IS_AUTO_ENTREPRENEUR)).toLowerCase() === 'true',
+    siret: get(keys.COMPANY_SIRET, ''),
+    siren: get(keys.COMPANY_SIREN, ''),
+    vatFR: get(keys.COMPANY_VAT_FR, ''),
+    rcs: get(keys.COMPANY_RCS, ''),
+    capital: get(keys.COMPANY_CAPITAL, ''),
+    legalForm: get(keys.COMPANY_LEGAL_FORM, ''),
+    apeCode: get(keys.COMPANY_APE_CODE, ''),
+    isAutoEntrepreneur: String(get(keys.IS_AUTO_ENTREPRENEUR, 'false')).toLowerCase() === 'true',
 
     // Cameroon (CM) Legal IDs
-    niu: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_NIU) || '',
-    rccm: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_RCCM) || '',
-    taxCenter: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_TAX_CENTER) || '',
+    niu: get(keys.COMPANY_NIU, ''),
+    rccm: get(keys.COMPANY_RCCM, ''),
+    taxCenter: get(keys.COMPANY_TAX_CENTER, ''),
 
     // USA (US) Legal IDs
-    ein: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_EIN) || '',
-    stateId: getParam(INVOICE_CONFIG.PARAM_KEYS.COMPANY_STATE_ID) || '',
-    salesTaxRate: parseFloat(getParam(INVOICE_CONFIG.PARAM_KEYS.SALES_TAX_RATE)) || 0,
+    ein: get(keys.COMPANY_EIN, ''),
+    stateId: get(keys.COMPANY_STATE_ID, ''),
+    salesTaxRate: parseFloat(get(keys.SALES_TAX_RATE, '0')) || 0,
 
     // Bank Details
-    bankName: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_NAME) || '',
-    bankIban: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_IBAN) || '',
-    bankBic: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_BIC) || '',
-    bankAccountName: getParam(INVOICE_CONFIG.PARAM_KEYS.BANK_ACCOUNT_NAME) || '',
+    bankName: get(keys.BANK_NAME, ''),
+    bankIban: get(keys.BANK_IBAN, ''),
+    bankBic: get(keys.BANK_BIC, ''),
+    bankAccountName: get(keys.BANK_ACCOUNT_NAME, ''),
 
     // VAT/Tax Settings
-    defaultVatRate: parseFloat(getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_VAT_RATE)) || 0,
-    vatRatesList: getParam(INVOICE_CONFIG.PARAM_KEYS.VAT_RATES_LIST) || '',
+    defaultVatRate: parseFloat(get(keys.DEFAULT_VAT_RATE, '0')) || 0,
+    vatRatesList: get(keys.VAT_RATES_LIST, ''),
 
     // Payment Terms
-    defaultPaymentTerms: getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_TERMS) || '',
-    defaultPaymentDays: parseInt(getParam(INVOICE_CONFIG.PARAM_KEYS.DEFAULT_PAYMENT_DAYS)) || 30
+    defaultPaymentTerms: get(keys.DEFAULT_PAYMENT_TERMS, ''),
+    defaultPaymentDays: parseInt(get(keys.DEFAULT_PAYMENT_DAYS, '30')) || 30
   };
 
   return params;
@@ -599,24 +646,11 @@ function isEmpty(value) {
  */
 function initSidebarContext() {
   // IMPORTANT: Get UI reference FIRST before any spreadsheet operations
-  // This ensures the UI context is established early in the execution
   const ui = SpreadsheetApp.getUi();
-
-  // Now get spreadsheet reference
   const ss = SpreadsheetApp.getActiveSpreadsheet();
 
-  // Force multiple read operations to ensure authorization is complete
-  ss.getName();
-  const activeSheet = ss.getActiveSheet();
-  if (activeSheet) {
-    activeSheet.getName();
-  }
-
-  // Force flush
-  SpreadsheetApp.flush();
-
-  // Longer delay for first-time authorization (200ms)
-  Utilities.sleep(200);
+  // Preload settings cache to avoid delays later
+  loadSettingsCache();
 
   return { ss: ss, ui: ui };
 }
