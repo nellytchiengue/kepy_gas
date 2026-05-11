@@ -56,7 +56,7 @@ Rédige le contenu de la page produit :
 - Description courte (150 caractères)
 - Description longue avec :
   * 3-5 bullet points "problèmes résolus"
-  * 5-7 features clés avec emojis
+  * 5-7 features clés ( sans trop mettre d'émojis doit etre pro)
   * Témoignages fictifs réalistes (3)
   * Section "Pour qui ?"
   * Section "Ce qui est inclus"
@@ -145,7 +145,7 @@ Structure ta réponse en sections claires avec :
 ### Page Gumroad
 
 - [ ] Titre optimisé SEO
-- [ ] Description avec emojis
+- [ ] Description pro sans mettre (ou quasiment pas) emojis
 - [ ] Image de couverture (1280x720)
 - [ ] Galerie screenshots
 - [ ] Prix avec réduction lancement
