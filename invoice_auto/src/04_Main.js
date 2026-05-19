@@ -47,6 +47,7 @@ function onOpen() {
     .addItem(regenerateFooterLabel, 'menuRegenerateLegalFooter')
     .addItem(msg.MENU_SETUP_INSTALLATION, 'launchSetupWizard')
     .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
+    .addItem(lang === 'FR' ? '✨ Appliquer le design pro' : '✨ Apply Pro Design', 'menuApplyDesign')
     .addItem(msg.MENU_ABOUT, 'menuAbout')
     .addToUi();
 
