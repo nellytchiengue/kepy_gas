@@ -110,8 +110,9 @@ function getEmailPreview(invoiceId) {
 // ============================================================================
 
 /**
- * Sends email with custom subject and body
- * @param {Object} data - {invoiceId, recipientEmail, subject, body}
+ * Sends email with custom subject and body (Direct send mode)
+ * Envoie un email avec sujet et corps personnalisés (Mode envoi direct)
+ * @param {Object} data - {invoiceId, recipientEmail, subject, body, mode: 'SEND'|'DRAFT'}
  * @returns {Object} Result object
  */
 function processSendEmail(data) {
@@ -143,33 +144,60 @@ function processSendEmail(data) {
 
     const companyParams = getCompanyParams();
     const senderEmail = getParam(INVOICE_CONFIG.PARAM_KEYS.SENDER_EMAIL);
+    const mode = data.mode || 'SEND'; // Default to SEND mode
 
-    // Send email with custom subject and body
-    GmailApp.sendEmail(
-      data.recipientEmail,
-      data.subject,
-      data.body,
-      {
-        attachments: [pdfFile.getBlob()],
-        name: companyParams.name,
-        cc: senderEmail
-      }
-    );
+    // Check mode: DRAFT or SEND
+    if (mode === 'DRAFT') {
+      // Create draft email instead of sending
+      GmailApp.createDraft(
+        data.recipientEmail,
+        data.subject,
+        data.body,
+        {
+          attachments: [pdfFile.getBlob()],
+          name: companyParams.name
+        }
+      );
 
-    // Mark invoice as sent
-    markInvoiceAsSent(data.invoiceId);
+      logSuccess('processSendEmail', 'Draft created for ' + data.recipientEmail + ' for invoice ' + data.invoiceId);
 
-    logSuccess('processSendEmail', 'Email sent to ' + data.recipientEmail + ' for invoice ' + data.invoiceId);
+      SpreadsheetApp.flush();
+      return {
+        success: true,
+        message: 'Draft created successfully',
+        recipientEmail: data.recipientEmail,
+        mode: 'DRAFT'
+      };
 
-    SpreadsheetApp.flush();
-    return {
-      success: true,
-      message: 'Email sent successfully',
-      recipientEmail: data.recipientEmail
-    };
+    } else {
+      // Send email directly
+      GmailApp.sendEmail(
+        data.recipientEmail,
+        data.subject,
+        data.body,
+        {
+          attachments: [pdfFile.getBlob()],
+          name: companyParams.name,
+          cc: senderEmail
+        }
+      );
+
+      // Mark invoice as sent (only for direct send)
+      markInvoiceAsSent(data.invoiceId);
+
+      logSuccess('processSendEmail', 'Email sent to ' + data.recipientEmail + ' for invoice ' + data.invoiceId);
+
+      SpreadsheetApp.flush();
+      return {
+        success: true,
+        message: 'Email sent successfully',
+        recipientEmail: data.recipientEmail,
+        mode: 'SEND'
+      };
+    }
 
   } catch (error) {
-    logError('processSendEmail', 'Error sending email', error);
+    logError('processSendEmail', 'Error processing email', error);
     SpreadsheetApp.flush();
     return {
       success: false,
@@ -191,7 +219,7 @@ function getSendEmailFormHtml() {
   // Bilingual labels
   const L = lang === 'FR' ? {
     title: 'Envoyer par email',
-    subtitle: 'Envoyez la facture directement au client',
+    subtitle: 'Envoyez la facture directement au client ou creez un brouillon',
     noInvoices: 'Aucune facture a envoyer',
     noInvoicesHint: 'Generez d\'abord des factures pour pouvoir les envoyer.',
     selectSection: 'Selectionner une facture',
@@ -205,17 +233,21 @@ function getSendEmailFormHtml() {
     subject: 'Objet',
     body: 'Message',
     editHint: 'Vous pouvez modifier le texte avant envoi',
-    btnSend: 'Envoyer l\'email',
+    btnSend: 'Envoyer directement',
+    btnDraft: 'Creer un brouillon',
     btnCancel: 'Annuler',
-    processing: 'Envoi en cours...',
+    processing: 'Traitement en cours...',
+    processingDraft: 'Creation du brouillon...',
     success: 'Email envoye avec succes!',
+    successDraft: 'Brouillon cree avec succes!',
     error: 'Erreur',
     sentTo: 'Envoye a',
+    draftFor: 'Brouillon pour',
     currency: currencySymbol,
     selectFirst: 'Selectionnez une facture pour voir l\'apercu'
   } : {
     title: 'Send by Email',
-    subtitle: 'Send the invoice directly to the client',
+    subtitle: 'Send the invoice directly to the client or create a draft',
     noInvoices: 'No invoices to send',
     noInvoicesHint: 'Generate invoices first to be able to send them.',
     selectSection: 'Select an invoice',
@@ -229,12 +261,16 @@ function getSendEmailFormHtml() {
     subject: 'Subject',
     body: 'Message',
     editHint: 'You can edit the text before sending',
-    btnSend: 'Send Email',
+    btnSend: 'Send directly',
+    btnDraft: 'Create draft',
     btnCancel: 'Cancel',
-    processing: 'Sending...',
+    processing: 'Processing...',
+    processingDraft: 'Creating draft...',
     success: 'Email sent successfully!',
+    successDraft: 'Draft created successfully!',
     error: 'Error',
     sentTo: 'Sent to',
+    draftFor: 'Draft for',
     currency: currencySymbol,
     selectFirst: 'Select an invoice to see the preview'
   };
@@ -380,12 +416,13 @@ function getSendEmailFormHtml() {
   // Status & Buttons
   html += '<div class="status" id="status"><div class="spinner"></div><span id="statusText"></span></div>';
   html += '<div class="buttons"><button type="button" class="btn-secondary" onclick="google.script.host.close()">' + L.btnCancel + '</button>';
+  html += '<button type="button" class="btn-secondary" id="btnDraft" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' + L.btnDraft + '</button>';
   html += '<button type="submit" class="btn-primary" id="btnSubmit" disabled><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>' + L.btnSend + '</button></div>';
   html += '</form>';
 
   // JavaScript
   html += '<script>';
-  html += 'var L={processing:"' + L.processing + '",success:"' + L.success + '",error:"' + L.error + '",sentTo:"' + L.sentTo + '",currency:"' + L.currency + '"};';
+  html += 'var L={processing:"' + L.processing + '",processingDraft:"' + L.processingDraft + '",success:"' + L.success + '",successDraft:"' + L.successDraft + '",error:"' + L.error + '",sentTo:"' + L.sentTo + '",draftFor:"' + L.draftFor + '",currency:"' + L.currency + '"};';
   html += 'var invoiceSelect=document.getElementById("invoiceSelect");';
   html += 'var invoiceInfo=document.getElementById("invoiceInfo");';
   html += 'var previewPlaceholder=document.getElementById("previewPlaceholder");';
@@ -396,6 +433,7 @@ function getSendEmailFormHtml() {
   html += 'var recipientName=document.getElementById("recipientName");';
   html += 'var recipientEmail=document.getElementById("recipientEmail");';
   html += 'var btnSubmit=document.getElementById("btnSubmit");';
+  html += 'var btnDraft=document.getElementById("btnDraft");';
   html += 'var currentInvoiceId=null;';
 
   // Invoice selection change - load preview
@@ -421,6 +459,7 @@ function getSendEmailFormHtml() {
   html += 'recipientEmail.textContent=r.recipientEmail;';
   html += 'previewSection.classList.add("visible");';
   html += 'btnSubmit.disabled=false;';
+  html += 'btnDraft.disabled=false;';
   html += '}else{';
   html += 'previewPlaceholder.style.display="block";';
   html += '}';
@@ -434,31 +473,45 @@ function getSendEmailFormHtml() {
   html += 'previewPlaceholder.style.display="block";';
   html += 'previewSection.classList.remove("visible");';
   html += 'btnSubmit.disabled=true;';
+  html += 'btnDraft.disabled=true;';
   html += 'currentInvoiceId=null;';
   html += '}});';
 
-  // Form submission
-  html += 'document.getElementById("emailForm").addEventListener("submit",function(e){e.preventDefault();';
+  // Helper function to send email (SEND or DRAFT mode)
+  html += 'function sendEmail(mode){';
   html += 'if(!currentInvoiceId){return;}';
   html += 'var status=document.getElementById("status");';
   html += 'btnSubmit.disabled=true;';
+  html += 'btnDraft.disabled=true;';
   html += 'status.className="status loading";';
-  html += 'status.innerHTML=\'<div class="spinner"></div><span>\'+L.processing+\'</span>\';';
-  html += 'var data={invoiceId:currentInvoiceId,recipientEmail:recipientEmail.textContent,subject:emailSubject.value,body:emailBody.value};';
+  html += 'var loadingMsg=mode==="DRAFT"?L.processingDraft:L.processing;';
+  html += 'status.innerHTML=\'<div class="spinner"></div><span>\'+loadingMsg+\'</span>\';';
+  html += 'var data={invoiceId:currentInvoiceId,recipientEmail:recipientEmail.textContent,subject:emailSubject.value,body:emailBody.value,mode:mode};';
   html += 'google.script.run.withSuccessHandler(function(r){';
   html += 'if(r.success){';
   html += 'status.className="status success";';
-  html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>\'+L.success+" "+L.sentTo+" "+r.recipientEmail+\'</span>\';';
+  html += 'var successMsg=r.mode==="DRAFT"?L.successDraft:L.success;';
+  html += 'var actionMsg=r.mode==="DRAFT"?L.draftFor:L.sentTo;';
+  html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg><span>\'+successMsg+" "+actionMsg+" "+r.recipientEmail+\'</span>\';';
   html += '}else{';
   html += 'status.className="status error";';
   html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+": "+r.message+\'</span>\';';
   html += 'btnSubmit.disabled=false;';
+  html += 'btnDraft.disabled=false;';
   html += '}';
   html += '}).withFailureHandler(function(err){';
   html += 'status.className="status error";';
   html += 'status.innerHTML=\'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>\'+L.error+\'</span>\';';
   html += 'btnSubmit.disabled=false;';
-  html += '}).processSendEmail(data);});';
+  html += 'btnDraft.disabled=false;';
+  html += '}).processSendEmail(data);';
+  html += '}';
+
+  // Form submission (Send button)
+  html += 'document.getElementById("emailForm").addEventListener("submit",function(e){e.preventDefault();sendEmail("SEND");});';
+
+  // Draft button click
+  html += 'btnDraft.addEventListener("click",function(){sendEmail("DRAFT");});';
 
   html += '</script></body></html>';
   return html;

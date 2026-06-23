@@ -565,7 +565,8 @@ function createNewInvoice(clientInfo, description, quantity, unitPrice, tva) {
     var totalAmount = (quantity * unitPrice) + tvaAmount;
     var createdAt = formatDateTime(new Date());
 
-    // Row data: InvoiceID, Date, Client info, Description, Qty, Price, TVA, Total, Status, PDFUrl, CreatedAt, GeneratedAt, SentAt
+    // Row data matches INVOICE_CONFIG.COLUMNS order exactly:
+    // A-L: invoice fields, M: GEN_CHECKBOX, N: EMAIL_CHECKBOX, O: PDFUrl, P: CreatedAt, Q: GeneratedAt, R: SentAt, S: Notes
     var newRow = [
       invoiceId,
       new Date(),
@@ -579,12 +580,22 @@ function createNewInvoice(clientInfo, description, quantity, unitPrice, tva) {
       tvaAmount,
       totalAmount,
       INVOICE_CONFIG.STATUSES.DRAFT,
-      '',           // PDFUrl (empty)
-      createdAt,    // CreatedAt
-      '',           // GeneratedAt (empty)
-      ''            // SentAt (empty)
+      '',           // M: GEN_CHECKBOX placeholder (insertCheckboxes below)
+      '',           // N: EMAIL_CHECKBOX placeholder (insertCheckboxes below)
+      '',           // O: PDFUrl (empty)
+      createdAt,    // P: CreatedAt
+      '',           // Q: GeneratedAt (empty)
+      '',           // R: SentAt (empty)
+      ''            // S: Notes (empty)
     ];
     invoicesSheet.appendRow(newRow);
+
+    // Insert action checkboxes at M (Generate) and N (Email Draft)
+    const newRowIndex = invoicesSheet.getLastRow();
+    invoicesSheet.getRange(newRowIndex, INVOICE_CONFIG.COLUMNS.GEN_CHECKBOX + 1)
+      .insertCheckboxes().setValue(false);
+    invoicesSheet.getRange(newRowIndex, INVOICE_CONFIG.COLUMNS.EMAIL_CHECKBOX + 1)
+      .insertCheckboxes().setValue(false);
 
     logSuccess('createNewInvoice', 'Facture ' + invoiceId + ' créée pour client ' + clientInfo.id + ' à ' + createdAt);
     return { success: true, invoiceId: invoiceId, message: 'OK' };

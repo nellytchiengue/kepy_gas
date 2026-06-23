@@ -35,20 +35,31 @@ function launchSetupWizard() {
     return;
   }
 
-  // Step 1: Use existing template / Utiliser le template existant
-  SpreadsheetApp.flush(); // Force UI refresh before alert
+  // Step 1: Create InvoiceFlash folder + copy master template into it
+  SpreadsheetApp.flush();
   ui.alert(messages.STEP1_TITLE, messages.STEP1_MESSAGE, ui.ButtonSet.OK);
 
   try {
-    // Template ID will be collected during setup or use default
-    // User can update this in Settings sheet after setup
-    var templateId = '';
+    // Create (or reuse) the InvoiceFlash folder first so both files land there
+    const folderResult = createInvoiceFlashFolder();
+    const invoiceFlashFolderId = folderResult.success ? folderResult.folderId : null;
 
-    // Step 2: Auto-detect Drive folder / Détecter automatiquement le dossier Driveæ
+    var templateId = copyMasterTemplateToUserDrive(lang, invoiceFlashFolderId);
+    if (!templateId) {
+      ui.alert(messages.ERROR, messages.STEP1_ERROR, ui.ButtonSet.OK);
+      return;
+    }
+
+    // Move the spreadsheet itself into the InvoiceFlash folder (best-effort)
+    if (invoiceFlashFolderId) {
+      moveSpreadsheetToFolder(invoiceFlashFolderId);
+    }
+
+    // Step 2: Use InvoiceFlash folder as storage folder / Dossier de stockage
     SpreadsheetApp.flush(); // Force UI refresh before alert
     ui.alert(messages.STEP2_TITLE, messages.STEP2_MESSAGE, ui.ButtonSet.OK);
 
-    const folderId = getCurrentSpreadsheetFolder();
+    const folderId = invoiceFlashFolderId || getCurrentSpreadsheetFolder();
 
     if (!folderId) {
       SpreadsheetApp.flush(); // Force UI refresh before alert
@@ -75,6 +86,24 @@ function launchSetupWizard() {
       SpreadsheetApp.flush(); // Force UI refresh before alert
       ui.alert(messages.ERROR, messages.STEP4_ERROR, ui.ButtonSet.OK);
       return;
+    }
+
+    // Persist folder ID and setup status to ScriptProperties so generateInvoiceSafe works
+    try {
+      const scriptProps = PropertiesService.getScriptProperties();
+      scriptProps.setProperty(SETUP_PROPERTIES.INVOICEFLASH_FOLDER_ID, folderId);
+      scriptProps.setProperty(SETUP_PROPERTIES.SETUP_COMPLETED, 'true');
+      scriptProps.setProperty(SETUP_PROPERTIES.SETUP_DATE, new Date().toISOString());
+    } catch (e) {
+      Logger.log('[WARN] launchSetupWizard: Could not save to ScriptProperties: ' + e);
+    }
+
+    // Clean up old triggers + install invoice checkbox trigger
+    try {
+      installDashboardButtonTrigger();
+      installInvoiceCheckboxTrigger();
+    } catch (e) {
+      Logger.log('[WARN] launchSetupWizard: Could not install triggers: ' + e);
     }
 
     // Step 5: Test permissions / Tester les permissions
@@ -142,6 +171,58 @@ function launchSetupWizard() {
 // ============================================================================
 
 /**
+ * Copies the master InvoiceFlash Docs template into the user's Drive root.
+ * Returns the ID of the user's own copy so they can customize it freely.
+ * The master template must be shared as "Anyone with the link can view".
+ *
+ * @param {string} lang - Language code
+ * @returns {string|null} Template copy ID, or null on failure
+ */
+function copyMasterTemplateToUserDrive(lang, destFolderId) {
+  try {
+    const masterTemplateId = INVOICE_CONFIG.MASTER_TEMPLATE_DOCS_ID;
+
+    if (!masterTemplateId || masterTemplateId === 'REPLACE_WITH_YOUR_TEMPLATE_DOCS_ID') {
+      Logger.log('[ERROR] copyMasterTemplateToUserDrive: MASTER_TEMPLATE_DOCS_ID not configured');
+      return null;
+    }
+
+    // If the user already has a valid template copy saved, reuse it (move to folder if needed)
+    const existingId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
+    if (existingId && existingId !== masterTemplateId) {
+      try {
+        const existingFile = DriveApp.getFileById(existingId);
+        if (destFolderId) {
+          try {
+            existingFile.moveTo(DriveApp.getFolderById(destFolderId));
+          } catch (moveErr) {
+            Logger.log('[WARN] copyMasterTemplateToUserDrive: could not move existing template: ' + moveErr);
+          }
+        }
+        logSuccess('copyMasterTemplateToUserDrive', 'Reusing existing template copy: ' + existingId);
+        return existingId;
+      } catch (e) {
+        Logger.log('[WARN] copyMasterTemplateToUserDrive: existing template not accessible, creating new copy');
+      }
+    }
+
+    const masterFile = DriveApp.getFileById(masterTemplateId);
+    const copyName = lang === 'FR' ? 'InvoiceFlash - Modèle de facture' : 'InvoiceFlash - Invoice Template';
+    const destFolder = destFolderId
+      ? DriveApp.getFolderById(destFolderId)
+      : DriveApp.getRootFolder();
+    const copy = masterFile.makeCopy(copyName, destFolder);
+
+    logSuccess('copyMasterTemplateToUserDrive', 'Template copied to Drive: ' + copy.getId());
+    return copy.getId();
+
+  } catch (error) {
+    logError('copyMasterTemplateToUserDrive', 'Failed to copy master template', error);
+    return null;
+  }
+}
+
+/**
  * Gets the folder ID where the current spreadsheet is located
  * Récupère l'ID du dossier où se trouve la feuille de calcul actuelle
  * @returns {string|null} Folder ID or null if failed
@@ -165,6 +246,27 @@ function getCurrentSpreadsheetFolder() {
   } catch (error) {
     Logger.log('❌ Error detecting folder: ' + error);
     return null;
+  }
+}
+
+/**
+ * Moves the current spreadsheet into the given Drive folder (best-effort).
+ * Skips silently if the spreadsheet is already inside that folder.
+ * @param {string} targetFolderId
+ */
+function moveSpreadsheetToFolder(targetFolderId) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const ssFile = DriveApp.getFileById(ss.getId());
+    const parents = ssFile.getParents();
+    const currentParentId = parents.hasNext() ? parents.next().getId() : null;
+
+    if (currentParentId === targetFolderId) return; // already there
+
+    ssFile.moveTo(DriveApp.getFolderById(targetFolderId));
+    Logger.log('[INFO] moveSpreadsheetToFolder: spreadsheet moved to InvoiceFlash folder');
+  } catch (e) {
+    Logger.log('[WARN] moveSpreadsheetToFolder: could not move spreadsheet: ' + e);
   }
 }
 
@@ -860,7 +962,7 @@ function formatSettingsSheet(sheet) {
  * @param {Object} companyInfo - Company information
  * @returns {Object} Result object with success status and URL
  */
-function createTestInvoice(companyInfo) {
+function createTestInvoice(_companyInfo) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let invoicesSheet = ss.getSheetByName(INVOICE_CONFIG.SHEETS.INVOICES);
@@ -874,7 +976,8 @@ function createTestInvoice(companyInfo) {
         'InvoiceID', 'InvoiceDate', 'ClientName', 'ClientEmail',
         'ClientPhone', 'ClientAddress', 'Description', 'Quantity',
         'UnitPrice', 'TVA', 'TotalAmount', 'Status', 'PDFUrl',
-        'CreatedAt', 'GeneratedAt', 'SentAt'
+        'CreatedAt', 'GeneratedAt', 'SentAt', 'Notes',
+        '📄 Generate', '📧 Send Email'
       ];
 
       invoicesSheet.getRange(1, 1, 1, headers.length)
@@ -903,10 +1006,18 @@ function createTestInvoice(companyInfo) {
       '',        // PDFUrl
       createdAt, // CreatedAt
       '',        // GeneratedAt
-      ''         // SentAt
+      '',        // SentAt
+      ''         // Notes
     ];
 
     invoicesSheet.appendRow(testData);
+
+    // Insert action checkboxes in columns R and S for the test row
+    const testRowIndex = invoicesSheet.getLastRow();
+    invoicesSheet.getRange(testRowIndex, INVOICE_CONFIG.COLUMNS.GEN_CHECKBOX + 1)
+      .insertCheckboxes().setValue(false);
+    invoicesSheet.getRange(testRowIndex, INVOICE_CONFIG.COLUMNS.EMAIL_CHECKBOX + 1)
+      .insertCheckboxes().setValue(false);
 
     // Generate the test invoice / Générer la facture de test
     // Note: This requires the InvoiceGenerator functions to be updated

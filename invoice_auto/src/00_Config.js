@@ -40,10 +40,13 @@ const INVOICE_CONFIG = {
     TVA: 9,              // Column J - TVA/VAT percentage or amount
     TOTAL_AMOUNT: 10,    // Column K - Total amount = Qty × Unit Price + TVA
     STATUS: 11,          // Column L - Invoice status
-    PDF_URL: 12,         // Column M - Generated PDF link (auto-filled)
-    CREATED_AT: 13,      // Column N - Date/time when invoice was created (Draft)
-    GENERATED_AT: 14,    // Column O - Date/time when invoice was generated (PDF)
-    SENT_AT: 15          // Column P - Date/time when invoice was sent by email
+    GEN_CHECKBOX: 12,    // Column M - Check to generate PDF (auto-reset after action)
+    EMAIL_CHECKBOX: 13,  // Column N - Check to create email draft (auto-reset after action)
+    PDF_URL: 14,         // Column O - Generated PDF link (auto-filled)
+    CREATED_AT: 15,      // Column P - Date/time when invoice was created (Draft)
+    GENERATED_AT: 16,    // Column Q - Date/time when invoice was generated (PDF)
+    SENT_AT: 17,         // Column R - Date/time when invoice was sent by email
+    NOTES: 18            // Column S - Internal notes
   },
 
   // ---------------------------------------------------------------------------
@@ -97,10 +100,13 @@ const INVOICE_CONFIG = {
     TVA: 'TVA',
     TOTAL_AMOUNT: 'TotalAmount',
     STATUS: 'Status',
+    GEN_CHECKBOX: '📄 Generate',
+    EMAIL_CHECKBOX: '📧 Send Email',
     PDF_URL: 'PDFUrl',
     CREATED_AT: 'CreatedAt',
     GENERATED_AT: 'GeneratedAt',
-    SENT_AT: 'SentAt'
+    SENT_AT: 'SentAt',
+    NOTES: 'Notes'
   },
 
   // ---------------------------------------------------------------------------
@@ -182,6 +188,13 @@ const INVOICE_CONFIG = {
     // Folder Organization / Organisation des Dossiers
     CLIENTS_FOLDER_NAME: 'CLIENTS_FOLDER_NAME'  // Parent folder name for all client docs (default: CLIENTS)
   },
+
+  // ---------------------------------------------------------------------------
+  // MASTER TEMPLATE DOC ID (shared publicly "Anyone with link can view")
+  // ID du template Google Docs maître — doit être partagé "Tout le monde peut voir"
+  // Replace this value with your actual Docs template ID before distributing.
+  // ---------------------------------------------------------------------------
+  MASTER_TEMPLATE_DOCS_ID: '1i7FN9vVs1z9snqewz98qfTjiEIxl5UEaf73eDBHwbeg',
 
   // ---------------------------------------------------------------------------
   // MARKERS USED IN GOOGLE DOCS TEMPLATE

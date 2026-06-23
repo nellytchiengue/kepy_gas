@@ -15,43 +15,81 @@
  */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  const msg = getUIMessages();
-  const lang = getConfiguredLocale();
 
-  // Label pour l'enregistrement d'une vente (étape 1)
-  const newSaleLabel = lang === 'FR' ? '➕ Enregistrement d\'une vente' : '➕ Record a sale';
-
-  // Label pour la génération de factures (étape 2)
-  const generateLabel = lang === 'FR' ? '📄 Génération de facture(s)' : '📄 Generate invoice(s)';
-
-  // Label pour l'envoi de mails (étape 3)
-  const sendEmailLabel = lang === 'FR' ? '📧 Envoi de mail(s)' : '📧 Send email(s)';
-
-  // Label pour changer de langue (affiche l'autre langue disponible)
-  const changeLangLabel = lang === 'FR' ? '🌐 Switch to English' : '🌐 Passer en Français';
-
-  // Label pour régénérer le footer légal
-  const regenerateFooterLabel = lang === 'FR' ? '📝 Régénérer footer légal' : '📝 Regenerate Legal Footer';
-
-  ui.createMenu(msg.MENU_TITLE)
-    .addItem('1️⃣ - ' + newSaleLabel, 'menuAddNewInvoice')
+  // 1. Créer le menu EN PREMIER — sans aucun appel externe.
+  // Le menu doit apparaître même si tout le reste échoue.
+  ui.createMenu('📄 InvoiceFlash')
+    .addItem('1️⃣ - ➕ Nouvelle vente / New sale', 'menuAddNewInvoice')
     .addSeparator()
-    .addItem('2️⃣ - ' + generateLabel, 'menuGenerateInvoices')
+    .addItem('2️⃣ - 📄 Générer facture(s) / Generate invoice(s)', 'menuGenerateInvoices')
     .addSeparator()
-    .addItem('3️⃣ - ' + sendEmailLabel, 'menuSendEmail')
+    .addItem('3️⃣ - 📧 Envoyer mail(s) / Send email(s)', 'menuSendEmail')
     .addSeparator()
-    .addItem(msg.MENU_STATISTICS, 'menuStatistics')
+    .addItem('📊 Statistiques / Statistics', 'menuStatistics')
     .addSeparator()
-    .addSeparator()
-    .addItem(changeLangLabel, 'menuChangeLanguage')
-    .addItem(regenerateFooterLabel, 'menuRegenerateLegalFooter')
-    .addItem(msg.MENU_SETUP_INSTALLATION, 'launchSetupWizard')
-    .addItem(msg.MENU_TEST_PERMISSIONS, 'menuTestPermissions')
-    .addItem(lang === 'FR' ? '✨ Appliquer le design pro' : '✨ Apply Pro Design', 'menuApplyDesign')
-    .addItem(msg.MENU_ABOUT, 'menuAbout')
+    .addItem('⚙️ Configuration Initiale / Initial Setup', 'menuInitialSetup')
+    .addItem('🔧 Réparer les triggers / Repair Triggers', 'menuRepairTriggers')
+    .addItem('🌐 Changer la langue / Change language', 'menuChangeLanguage')
+    .addItem('📝 Régénérer footer légal / Regenerate footer', 'menuRegenerateLegalFooter')
+    .addItem('🚀 Assistant de configuration / Setup Wizard', 'launchSetupWizard')
+    .addItem('🔐 Tester les permissions / Test permissions', 'menuTestPermissions')
+    .addItem('ℹ️ À propos / About', 'menuAbout')
     .addToUi();
 
-  Logger.log('Menu created successfully');
+  Logger.log('Menu InvoiceFlash created');
+
+  // 2. Vérification master vs copie (en silence si ça échoue)
+  try {
+    const isMaster = checkTemplateProtection();
+    if (isMaster) return;
+  } catch (e) {
+    Logger.log('Template protection check skipped: ' + e);
+  }
+
+  // 3. Create dashboard sheet on first open if it doesn't exist yet.
+  //    Uses SpreadsheetApp only — safe in a simple trigger.
+  //    Setup will later refresh it with the correct configured values.
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (!ss.getSheetByName(DASHBOARD_SHEET_NAME) && !ss.getSheetByName('Dashboard')) {
+      createDashboardSheet();
+      Logger.log('[onOpen] Dashboard sheet created on first open');
+    }
+  } catch (e) {
+    Logger.log('Dashboard auto-creation skipped: ' + e);
+  }
+
+  // 4. Detect if this spreadsheet is a copy of a previously-configured one.
+  //    ScriptProperties are copied with the spreadsheet, so SETUP_COMPLETED may
+  //    be 'true' even on a brand-new copy. We detect this by comparing the
+  //    stored spreadsheet ID against the current one.
+  try {
+    const scriptProps = PropertiesService.getScriptProperties();
+    const storedSsId  = scriptProps.getProperty('SETUP_SS_ID');
+    const currentSsId = SpreadsheetApp.getActiveSpreadsheet().getId();
+    if (storedSsId && storedSsId !== currentSsId) {
+      scriptProps.deleteAllProperties();
+      Logger.log('[onOpen] Spreadsheet copy detected — setup properties cleared');
+    }
+  } catch (e) {
+    Logger.log('Copy detection skipped: ' + e);
+  }
+
+  // 5. Popup de bienvenue si setup non fait (PropertiesService peut échouer sans auth)
+  // NOTE: UrlFetchApp interdit ici — le setup réel se lance via le menu.
+  try {
+    if (!isSetupCompleted()) {
+      ui.alert(
+        '👋 Bienvenue / Welcome — InvoiceFlash',
+        'Une configuration rapide est nécessaire avant de commencer.\n' +
+        'A quick setup is needed before you can start.\n\n' +
+        '▶  Menu  📄 InvoiceFlash  →  ⚙️ Configuration Initiale / Initial Setup',
+        ui.ButtonSet.OK
+      );
+    }
+  } catch (e) {
+    Logger.log('Setup check skipped: ' + e);
+  }
 }
 
 /**
@@ -387,6 +425,25 @@ ${msg.ABOUT_README}
 // ============================================================================
 // MENU FUNCTIONS - LANGUAGE CHANGE
 // ============================================================================
+
+/**
+ * Menu: Installs or repairs all required script triggers.
+ * Safe to run multiple times — skips triggers already installed.
+ * Call this after copying the template if checkboxes don't respond.
+ */
+function menuRepairTriggers() {
+  const ui   = SpreadsheetApp.getUi();
+  const lang = getConfiguredLocale();
+
+  installDashboardButtonTrigger();   // cleans up legacy handleDashboardButtons trigger
+  installInvoiceCheckboxTrigger();   // installs handleInvoiceCheckboxes if missing
+
+  const msg = lang === 'FR'
+    ? '✅ Triggers réparés.\n\nLes cases à cocher sur la feuille Invoices (colonnes 📄 et 📧) sont maintenant actives.'
+    : '✅ Triggers repaired.\n\nCheckboxes on the Invoices sheet (columns 📄 and 📧) are now active.';
+
+  ui.alert(lang === 'FR' ? '🔧 Réparation terminée' : '🔧 Repair complete', msg, ui.ButtonSet.OK);
+}
 
 /**
  * Menu: Changes the application language (FR <-> EN)

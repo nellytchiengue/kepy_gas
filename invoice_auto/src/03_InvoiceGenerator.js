@@ -18,26 +18,17 @@
  */
 function getOrCreateClientsFolder(rootFolder) {
   try {
-    // Get folder name from settings, default to "CLIENTS"
     const folderName = getParam(INVOICE_CONFIG.PARAM_KEYS.CLIENTS_FOLDER_NAME) || 'CLIENTS';
-
-    // Search for existing CLIENTS folder
     const existingFolders = rootFolder.getFoldersByName(folderName);
-
     if (existingFolders.hasNext()) {
-      const folder = existingFolders.next();
-      logSuccess('getOrCreateClientsFolder', `Using existing folder: ${folderName}`);
-      return folder;
+      logSuccess('getOrCreateClientsFolder', `Using existing CLIENTS folder`);
+      return existingFolders.next();
     }
-
-    // Create new CLIENTS folder if doesn't exist
     const newFolder = rootFolder.createFolder(folderName);
-    logSuccess('getOrCreateClientsFolder', `Created new folder: ${folderName}`);
+    logSuccess('getOrCreateClientsFolder', `Created CLIENTS folder`);
     return newFolder;
-
   } catch (error) {
     logError('getOrCreateClientsFolder', 'Error creating CLIENTS folder', error);
-    // Fallback: return root folder if creation fails
     return rootFolder;
   }
 }
@@ -54,29 +45,21 @@ function getOrCreateClientsFolder(rootFolder) {
  */
 function getOrCreateClientFolder(rootFolder, clientName) {
   try {
-    // First, get or create the CLIENTS parent folder
     const clientsFolder = getOrCreateClientsFolder(rootFolder);
-
-    // Clean client name to make it folder-safe
     const safeFolderName = cleanString(clientName).replace(/[^a-z0-9\s\-_]/gi, '_');
 
-    // Search for existing client folder inside CLIENTS
     const existingFolders = clientsFolder.getFoldersByName(safeFolderName);
-
     if (existingFolders.hasNext()) {
       const folder = existingFolders.next();
       logSuccess('getOrCreateClientFolder', `Using existing folder: CLIENTS/${safeFolderName}`);
       return folder;
     }
 
-    // Create new client folder inside CLIENTS if doesn't exist
     const newFolder = clientsFolder.createFolder(safeFolderName);
     logSuccess('getOrCreateClientFolder', `Created new folder: CLIENTS/${safeFolderName}`);
     return newFolder;
-
   } catch (error) {
     logError('getOrCreateClientFolder', `Error managing client folder for ${clientName}`, error);
-    // Fallback: return root folder if subfolder creation fails
     return rootFolder;
   }
 }
@@ -113,19 +96,43 @@ function generateInvoiceSafe(invoiceId) {
 
     // 3. RETRIEVE PARAMETERS
     var templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
-    var folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID);
     var companyParams = getCompanyParams();
 
-    if (!templateId || !folderId) {
-      return { success: false, error: 'Missing configuration: TEMPLATE_DOCS_ID or DRIVE_FOLDER_ID' };
+    if (!templateId) {
+      return { success: false, error: 'Missing configuration: TEMPLATE_DOCS_ID' };
     }
 
     // 4. GET OR CREATE CLIENT SUBFOLDER
-    var rootFolder = DriveApp.getFolderById(folderId);
+    // On a fresh copy, ScriptProperties may be empty — auto-create InvoiceFlash folder.
+    var rootFolder = getInvoiceFlashRootFolder();
+    if (!rootFolder) {
+      logError('generateInvoiceSafe', 'InvoiceFlash folder not in ScriptProperties, auto-creating');
+      var autoFolderResult = createInvoiceFlashFolder();
+      if (!autoFolderResult.success) {
+        return { success: false, error: 'InvoiceFlash folder not found. Please run initial setup from the menu.' };
+      }
+      PropertiesService.getScriptProperties().setProperty(SETUP_PROPERTIES.INVOICEFLASH_FOLDER_ID, autoFolderResult.folderId);
+      rootFolder = DriveApp.getFolderById(autoFolderResult.folderId);
+    }
+
     var clientFolder = getOrCreateClientFolder(rootFolder, invoiceData.clientName);
 
     // 5. CREATE DOCUMENT FROM TEMPLATE
-    var templateFile = DriveApp.getFileById(templateId);
+    // On a copied spreadsheet, TEMPLATE_DOCS_ID may point to the creator's template — auto-copy if inaccessible.
+    var templateFile;
+    try {
+      templateFile = DriveApp.getFileById(templateId);
+    } catch (e) {
+      logError('generateInvoiceSafe', 'TEMPLATE_DOCS_ID inaccessible, copying master template', e);
+      var copyLang = getConfiguredLocale();
+      var newSafeTemplateId = copyMasterTemplateToUserDrive(copyLang);
+      if (!newSafeTemplateId) {
+        return { success: false, error: 'Invoice template not accessible. Please run Setup Wizard from the menu.' };
+      }
+      updateSettingsParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID, newSafeTemplateId);
+      clearSettingsCache();
+      templateFile = DriveApp.getFileById(newSafeTemplateId);
+    }
     var fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientName);
     tempDocFile = templateFile.makeCopy('TEMP_' + invoiceId + '_' + Date.now(), clientFolder);
     artifacts.push({ type: 'tempDoc', file: tempDocFile });
@@ -224,10 +231,10 @@ function generateInvoiceById(invoiceId) {
     const templateId = getParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID);
     const folderId = getParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID);
     const companyParams = getCompanyParams();
+    const lang = detectUserLanguage();
+    const messages = getMessages(lang);
 
     if (!templateId || !folderId) {
-      const lang = detectUserLanguage();
-      const messages = getMessages(lang);
       return {
         success: false,
         message: messages.ERROR_MISSING_PARAMS,
@@ -236,11 +243,40 @@ function generateInvoiceById(invoiceId) {
     }
 
     // 4. GET OR CREATE CLIENT SUBFOLDER
-    const rootFolder = DriveApp.getFolderById(folderId);
+    // On a copied spreadsheet, DRIVE_FOLDER_ID may point to the template creator's folder.
+    // Fall back to auto-creating an InvoiceFlash folder in the user's own Drive.
+    let rootFolder;
+    try {
+      rootFolder = DriveApp.getFolderById(folderId);
+    } catch (e) {
+      logError('generateInvoiceById', 'DRIVE_FOLDER_ID inaccessible, auto-creating folder', e);
+      const folderResult = createInvoiceFlashFolder();
+      if (!folderResult.success) {
+        return { success: false, message: messages.ERROR_FOLDER_NOT_FOUND, url: null };
+      }
+      PropertiesService.getScriptProperties().setProperty(SETUP_PROPERTIES.INVOICEFLASH_FOLDER_ID, folderResult.folderId);
+      updateSettingsParam(INVOICE_CONFIG.PARAM_KEYS.DRIVE_FOLDER_ID, folderResult.folderId);
+      clearSettingsCache();
+      rootFolder = DriveApp.getFolderById(folderResult.folderId);
+    }
     const clientFolder = getOrCreateClientFolder(rootFolder, invoiceData.clientName);
 
     // 5. CREATE DOCUMENT FROM TEMPLATE
-    const templateFile = DriveApp.getFileById(templateId);
+    // On a copied spreadsheet, TEMPLATE_DOCS_ID may point to the creator's template.
+    // Fall back to copying the shared master template to this user's Drive.
+    let templateFile;
+    try {
+      templateFile = DriveApp.getFileById(templateId);
+    } catch (e) {
+      logError('generateInvoiceById', 'TEMPLATE_DOCS_ID inaccessible, copying master template', e);
+      const newTemplateId = copyMasterTemplateToUserDrive(lang);
+      if (!newTemplateId) {
+        return { success: false, message: messages.ERROR_TEMPLATE_NOT_FOUND, url: null };
+      }
+      updateSettingsParam(INVOICE_CONFIG.PARAM_KEYS.TEMPLATE_DOCS_ID, newTemplateId);
+      clearSettingsCache();
+      templateFile = DriveApp.getFileById(newTemplateId);
+    }
     const fileName = generateSafeFileName(invoiceData.invoiceId, invoiceData.clientName);
     const newDocFile = templateFile.makeCopy(fileName, clientFolder);
     const doc = DocumentApp.openById(newDocFile.getId());
@@ -271,8 +307,6 @@ function generateInvoiceById(invoiceId) {
 
     logSuccess('generateInvoiceById', `Invoice ${invoiceId} generated successfully (Google Doc + PDF) in folder: ${invoiceData.clientName}`);
 
-    const lang = detectUserLanguage();
-    const messages = getMessages(lang);
     return {
       success: true,
       message: messages.SUCCESS_GENERATION,

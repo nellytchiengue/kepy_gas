@@ -49,12 +49,11 @@ InvoiceFlash est un système de facturation automatisée qui transforme vos donn
 
 ## 2. Installation
 
-### Étape 1 : Copier le fichier Google Sheet
+### Étape 1 : Créer votre copie personnelle
 
-1. Ouvrez le template Google Sheet fourni
-2. Menu **Fichier > Créer une copie**
-3. Renommez-le (ex: "Mes Factures 2025")
-4. Choisissez un dossier dans votre Drive
+1. Cliquez sur le lien fourni après votre achat sur Gumroad.
+2. Une page Google s'ouvre vous demandant de "Créer une copie".
+3. Cliquez sur le bouton bleu **Créer une copie**. Le fichier sera automatiquement enregistré dans votre propre Google Drive.
 
 ### Étape 2 : Ouvrir l'éditeur de scripts
 
